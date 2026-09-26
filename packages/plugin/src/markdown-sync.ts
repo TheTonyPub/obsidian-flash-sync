@@ -437,7 +437,7 @@ export class MarkdownSyncEngine {
     this.discoveryHealthy = false;
     const applyRevision = async (entry: Watched): Promise<boolean> => {
       if ((this.remoteRevisionBoundary.get(entry.key) ?? -1) >= entry.revision) return false;
-      await this.applyRemote(entry.value, entry.revision);
+      if (!await this.applyRemote(entry.value, entry.revision)) return false;
       this.remoteRevisionBoundary.set(entry.key, entry.revision);
       return true;
     };
@@ -703,8 +703,9 @@ export class MarkdownSyncEngine {
         }
         return;
       }
-      await this.applyRemote(entry.value, entry.revision);
-      this.remoteRevisionBoundary.set(entry.key, entry.revision);
+      if (await this.applyRemote(entry.value, entry.revision)) {
+        this.remoteRevisionBoundary.set(entry.key, entry.revision);
+      }
       if (!this.reconcilePromise && this.discoveryHealthy && !this.stopped) {
         this.options.status.reconciled = true;
         this.options.status.refresh();
@@ -1416,18 +1417,18 @@ export class MarkdownSyncEngine {
     }
   }
 
-  private async applyRemote(value: Uint8Array, revision: number): Promise<void> {
+  private async applyRemote(value: Uint8Array, revision: number): Promise<boolean> {
     let record: RemoteFileRecord;
     try { record = decodeRecord(value); }
-    catch { this.reportRecoverableIssue("A remote file record could not be decoded."); return; }
-    if (isConflictReviewPath(record.path)) return;
+    catch { this.reportRecoverableIssue("A remote file record could not be decoded."); return true; }
+    if (isConflictReviewPath(record.path)) return true;
     const { store, vault } = this.options;
     const current = await store.getFile(record.fileId);
-    if (current?.remoteRevision !== undefined && current.remoteRevision >= revision) return;
+    if (current?.remoteRevision !== undefined && current.remoteRevision >= revision) return true;
     await this.reconcileRemoteOwnership(record, current?.path);
     const pending = (await store.pending()).find((item) => item.fileId === record.fileId);
     if (pending) {
-      return;
+      return true;
     }
     if (record.deleted) {
       if (current && !current.deleted) {
@@ -1437,7 +1438,7 @@ export class MarkdownSyncEngine {
         const occupiedByOther = await this.isOccupiedByOtherIdentity(current.fileId, current.path, localHash, identities);
         if (local && localHash !== current.localHash && !occupiedByOther) {
           await this.capture(current.path, new TextDecoder().decode(local));
-          return;
+          return true;
         }
         if (local && !occupiedByOther) {
           this.deleteGuards.add(current.path);
@@ -1445,7 +1446,7 @@ export class MarkdownSyncEngine {
         }
       }
       await store.putFile(this.syncedIndex(record, revision));
-      return;
+      return true;
     }
     ({ record, revision } = await this.resolveIncomingCollision(record, revision));
     const path = normalizePath(record.path);
@@ -1455,18 +1456,18 @@ export class MarkdownSyncEngine {
       await this.captureBytes(localPath, local);
       if ((await store.pending()).some((item) => item.fileId === record.fileId)) {
         this.reportRecoverableIssue("A local edit was queued while applying a remote update; the update was deferred.");
-        return;
+        return true;
       }
     }
     if (local && sha256Hex(local) !== record.contentHash && !current) {
       if (record.kind === "text" && path.endsWith(".md")) {
-        if (!await this.preserveBootstrapConflict(record, new TextDecoder().decode(local))) return;
-      } else if (!await this.preserveBootstrapBytes(record, local)) return;
+        if (!await this.preserveBootstrapConflict(record, new TextDecoder().decode(local))) return true;
+      } else if (!await this.preserveBootstrapBytes(record, local)) return true;
     }
     let remoteBytes: Uint8Array | undefined;
     if (!local || sha256Hex(local) !== record.contentHash) {
       try { remoteBytes = await this.loadRecordBytes(record); }
-      catch { return; }
+      catch { return false; }
     }
     if (current && localPath !== path && local) {
       if (!vault.rename) throw new Error("Vault rename unavailable");
@@ -1478,6 +1479,7 @@ export class MarkdownSyncEngine {
       await vault.write(path, remoteBytes!);
     }
     await store.putFile(this.syncedIndex(record, revision));
+    return true;
   }
 
   private async resolveIncomingCollision(record: RemoteFileRecord, revision: number): Promise<{ record: RemoteFileRecord; revision: number }> {
