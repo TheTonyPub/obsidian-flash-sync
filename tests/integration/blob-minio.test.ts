@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import { createServer } from "node:net";
 import { afterAll, describe, expect, it } from "vitest";
 import { CreateBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { decodeRecord } from "../../packages/protocol/src/index.js";
+import { decodeRecord, encodeRecord, sha256Hex } from "../../packages/protocol/src/index.js";
 import { connectS3Blob } from "../../packages/plugin/src/blob-storage.js";
 import { SyncStatus } from "../../packages/plugin/src/connection.js";
 import { LocalStore } from "../../packages/plugin/src/local-store.js";
@@ -30,6 +30,41 @@ describe("disposable S3-compatible blob integration", () => {
     for (const replica of replicas) replica.engine.stop();
     for (const replica of replicas) { await replica.engine.settle(); replica.store.close(); }
     if (containerId) await execFile("docker", ["rm", "-f", containerId]);
+  });
+
+  it("retries a remote blob after a failed download is repaired", async () => {
+    const kv = new NatsKvDouble();
+    const payload = new Uint8Array([0, 1, 2, 3, 255]);
+    const hash = sha256Hex(payload);
+    kv.create("f.remote", encodeRecord({ schemaVersion: 1, fileId: "remote", path: "image.png", kind: "blob",
+      deleted: false, contentHash: hash, size: payload.length,
+      blob: { algorithm: "sha256", hash, key: `vaults/VAULT/blobs/sha256/${hash.slice(0, 2)}/${hash}`, size: payload.length },
+      origin: { deviceId: "other", operationId: "op", clientTime: 0 } }));
+    let repaired = false;
+    const blob = { upload: async () => {}, download: async () => {
+      if (!repaired) throw new Error("Blob is temporarily unavailable");
+      return payload;
+    } };
+    const vault = new VaultDouble();
+    const store = await LocalStore.open(`minio-retry-${crypto.randomUUID()}`, indexedDBDouble.indexedDB);
+    const status = new SyncStatus();
+    const engine = new MarkdownSyncEngine({ deviceId: "retry", vaultId: "VAULT", vault, store, kv, blob, status,
+      inlineLimit: 512, debounceMs: 0 });
+    try {
+      await engine.start();
+      expect(vault.read("image.png")).toBeUndefined();
+      expect(status.value).toBe("ERROR");
+
+      repaired = true;
+      await engine.reconcile();
+
+      expect(vault.read("image.png")).toEqual(payload);
+      expect(status.value).toBe("SYNCED");
+    } finally {
+      engine.stop();
+      await engine.settle();
+      store.close();
+    }
   });
 
   const run = process.env.S3_TEST_DOCKER === "1" ? it : it.skip;
