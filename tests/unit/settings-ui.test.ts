@@ -282,7 +282,7 @@ describe("settings UI interactions", () => {
     vi.stubGlobal("window", {});
     const { plugin, tab } = await createPlugin();
     const indicator = descendants(tab.containerEl).find((element) => element.getAttribute("role") === "status")!;
-    expect(indicator.getAttribute("aria-label")).toBe("Sync status: Disconnected");
+    expect(indicator.getAttribute("aria-label")).toBe("Sync status: Not configured");
     expect(indicator.classes).toContain("flash-sync-status-dot-gray");
 
     plugin.status.connected = true;
@@ -402,8 +402,8 @@ describe("settings UI interactions", () => {
     vi.stubGlobal("window", {});
     const { plugin, app } = await createPlugin();
     const item = (plugin as unknown as { statusItems: Array<InstanceType<typeof ui.FakeElement>> }).statusItems[0];
-    expect(item.getAttribute("aria-label")).toBe("Disconnected");
-    expect(item.textContent).toContain("Disconnected");
+    expect(item.getAttribute("aria-label")).toBe("Not configured");
+    expect(item.textContent).toContain("Not configured");
     expect(ui.setIcon).toHaveBeenLastCalledWith(expect.anything(), "cloud-off");
 
     item.click();

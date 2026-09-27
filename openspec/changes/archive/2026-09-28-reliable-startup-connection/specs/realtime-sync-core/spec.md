@@ -1,10 +1,4 @@
-# realtime-sync-core Specification
-
-## Purpose
-
-Defines durable remote synchronization state and live delivery for independent personal vaults without a custom sync backend.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Secure realtime remote state
 The plugin SHALL authenticate to NATS over WSS with the configured vault's username and password stored in Obsidian SecretStorage. It SHALL open only that vault's existing KV bucket and expose connection, pending-work, and convergence state locally. It SHALL NOT treat `vaultId` or the bucket name as authorization.

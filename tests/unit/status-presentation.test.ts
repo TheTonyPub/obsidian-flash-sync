@@ -23,6 +23,7 @@ describe("status presentation", () => {
 
   it("uses a distinct accessible presentation for offline, errors, and conflicts with a count", () => {
     const offline = new SyncStatus();
+    offline.connectionState = "OFFLINE";
     offline.refresh();
     const error = connected();
     error.markError("write");
@@ -56,6 +57,7 @@ describe("status presentation", () => {
     const conflict = connected(); conflict.conflictPaths = ["note.conflict.md"]; conflict.refresh();
     const error = connected(); error.markError("write");
     const offline = new SyncStatus(); offline.refresh();
+    offline.connectionState = "OFFLINE"; offline.refresh();
     const conflictAndError = connected(); conflictAndError.conflictPaths = ["note.conflict.md"]; conflictAndError.markError("write");
     const auth = connected(); auth.value = "AUTH_ERROR"; auth.connectionState = "AUTH_ERROR"; auth.refresh();
 
@@ -66,5 +68,21 @@ describe("status presentation", () => {
     expect(overviewStatusPresentation(offline)).toMatchObject({ color: "gray", label: "Disconnected" });
     expect(overviewStatusPresentation(conflictAndError)).toMatchObject({ color: "yellow", label: "1 conflict" });
     expect(overviewStatusPresentation(auth)).toMatchObject({ color: "gray", label: "Authentication failed" });
+  });
+
+  it("distinguishes unconfigured and scheduled retry states", () => {
+    const unconfigured = new SyncStatus();
+    unconfigured.refresh();
+    const retrying = new SyncStatus();
+    retrying.connectionState = "OFFLINE";
+    retrying.retrying = true;
+    retrying.refresh();
+    const connecting = new SyncStatus();
+    connecting.connectionState = "CONNECTING";
+    connecting.refresh();
+
+    expect(statusPresentation(unconfigured)).toMatchObject({ label: "Not configured", text: "Not configured" });
+    expect(statusPresentation(retrying)).toMatchObject({ color: "warning", label: "Retrying", text: "Retrying" });
+    expect(statusPresentation(connecting)).toMatchObject({ color: "neutral", label: "Connecting", text: "Connecting" });
   });
 });

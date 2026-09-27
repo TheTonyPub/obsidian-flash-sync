@@ -116,6 +116,37 @@ describe("reconciliation and durable replay", () => {
     engine.stop(); local.close();
   });
 
+  it("holds pending writes until the authenticated snapshot is complete, then replays them", async () => {
+    const backend = new NatsKvDouble();
+    const session = new SnapshotKvSessionDouble(0);
+    const local = await store();
+    const vault = new VaultDouble();
+    const content = "local work";
+    const hash = sha256Hex(bytes(content));
+    vault.write("pending.md", bytes(content));
+    await local.queue({ operationId: "pending", fileId: "file-local", type: "create", path: "pending.md",
+      content, localHash: hash, retryCount: 0, createdAt: 1 });
+    const create = vi.fn(backend.create.bind(backend));
+    const openSnapshotSession = vi.fn(() => session);
+    const kv: KvPort = { get: backend.get.bind(backend), list: backend.list.bind(backend), put: backend.put.bind(backend),
+      watch: backend.watch.bind(backend), create, update: backend.update.bind(backend), openSnapshotSession };
+    const status = new SyncStatus();
+    const engine = new MarkdownSyncEngine({ deviceId: "device-a", kv, store: local, vault, status });
+
+    const startup = engine.start();
+    await vi.waitFor(() => expect(openSnapshotSession).toHaveBeenCalledTimes(1));
+    expect(await local.pending()).toHaveLength(1);
+    expect(create).not.toHaveBeenCalled();
+
+    session.completeInitialSnapshot();
+    await startup;
+
+    expect(create).toHaveBeenCalled();
+    expect(await local.pending()).toHaveLength(0);
+    expect(status.reconciled).toBe(true);
+    engine.stop(); local.close();
+  });
+
   it("reconciles through the full-list fallback when the live snapshot consumer ends after startup", async () => {
     const backend = new NatsKvDouble();
     let finishDelivery!: () => void;

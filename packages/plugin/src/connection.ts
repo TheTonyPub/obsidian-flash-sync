@@ -61,6 +61,7 @@ export class SyncStatus {
   value: StatusValue = "INITIALIZING";
   connectionState: ConnectionState = "UNCONFIGURED";
   connectionError = "";
+  retrying = false;
   attachmentState: AttachmentState = "NOT_CONFIGURED";
   attachmentError = "";
   connected = false;
