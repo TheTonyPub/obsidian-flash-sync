@@ -19,7 +19,12 @@ export function overviewStatusPresentation(status: SyncStatus): OverviewStatusPr
 export function statusPresentation(status: SyncStatus): StatusPresentation {
   const conflicts = Math.max(status.conflicts, status.conflictPaths.length);
   if (status.value === "AUTH_ERROR") return { icon: "cloud-off", color: "muted", label: "Authentication failed", tooltip: "Authentication failed", text: "Authentication failed" };
-  if (!status.connected || status.value === "OFFLINE") return { icon: "cloud-off", color: "muted", label: "Disconnected", tooltip: "Disconnected", text: "Disconnected" };
+  if (!status.connected || status.value === "OFFLINE") {
+    const text = status.retrying ? "Retrying" : status.connectionState === "UNCONFIGURED" ? "Not configured"
+      : status.connectionState === "CONNECTING" ? "Connecting" : "Disconnected";
+    const color = status.retrying ? "warning" : status.connectionState === "CONNECTING" ? "neutral" : "muted";
+    return { icon: "cloud-off", color, label: text, tooltip: text, text };
+  }
   if (conflicts > 0) {
     const text = `${conflicts} ${conflicts === 1 ? "conflict" : "conflicts"}`;
     return { icon: "file-diff", color: "warning", label: text, tooltip: `${text} to review`, text };

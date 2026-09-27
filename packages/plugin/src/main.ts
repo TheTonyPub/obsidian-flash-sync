@@ -168,6 +168,15 @@ export default class EasySyncPlugin extends Plugin {
   private lastReconciledAt = 0;
   private hiddenAt = 0;
   private initialReconcileInFlight = false;
+  private connectionAttempt?: Promise<SettingsApplyResult>;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private automaticAttempts = 0;
+  private automaticRetryBlocked = false;
+  private connectionGeneration = 0;
+  private unloading = false;
+  private static readonly maxAutomaticAttempts = 5;
+  private static readonly retryBaseDelayMs = 1_000;
+  private static readonly retryDelayCapMs = 15_000;
   private static readonly desktopVisibilityReconcileAfterMs = 5 * 60 * 1000;
   private readonly logger = createLogger(() => this.config?.debugLogging ?? false, console,
     (message) => this.redactDiagnostic(message));
@@ -248,20 +257,25 @@ export default class EasySyncPlugin extends Plugin {
       const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
       if (file && validIncluded(file.path) && file.path.endsWith(".md")) this.engine.scheduleCapture(file.path, update.state.doc.toString());
     }));
-    this.app.workspace.onLayoutReady(() => { void this.connectNow(); });
+    this.app.workspace.onLayoutReady(() => { this.requestAutomaticConnection("startup"); });
     this.registerDomEvent(document, "visibilitychange", () => {
       if (document.hidden) {
         this.hiddenAt = Date.now();
       } else if (this.shouldReconcileOnVisibility()) {
-        this.reconcileAfter("visibilitychange");
+        this.requestLifecycleConnection("resume");
       } else {
         this.logger.debug("reconcile.visibility_skipped", { connected: this.status.connected, reconciled: this.status.reconciled });
       }
     });
-    this.registerDomEvent(window, "online", () => { this.reconcileAfter("online"); });
+    this.registerDomEvent(window, "online", () => { this.requestLifecycleConnection("online"); });
   }
 
   async onunload(): Promise<void> {
+    this.unloading = true;
+    this.connectionGeneration++;
+    this.clearRetryTimer();
+    this.status.retrying = false;
+    await this.operationQueue;
     await this.disconnect();
   }
 
@@ -380,7 +394,9 @@ export default class EasySyncPlugin extends Plugin {
         this.status.attachmentError = "";
       }
       if (!reconnectNeeded) return { kind: "applied" };
+      this.resetAutomaticRetries(true);
       if (connectionFields && !validation.configured) {
+        this.automaticRetryBlocked = true;
         await this.disconnect();
         this.status.connectionState = "UNCONFIGURED";
         this.status.connectionError = "";
@@ -388,7 +404,15 @@ export default class EasySyncPlugin extends Plugin {
         this.status.refresh();
         return { kind: "not-configured" };
       }
+      const generation = this.connectionGeneration;
       const result = await this.connectNowUnlocked();
+      if (this.status.connectionState === "AUTH_ERROR" || result.kind === "validation-error" || result.kind === "not-configured") {
+        this.automaticRetryBlocked = true;
+        this.automaticAttempts = 0;
+      } else if (result.kind === "connection-error" && this.status.connectionState === "OFFLINE") {
+        this.automaticAttempts = 1;
+        this.scheduleAutomaticRetry(generation);
+      }
       return result.kind === "connection-error" || result.kind === "validation-error" ? result : { kind: "applied" };
     });
   }
@@ -409,6 +433,95 @@ export default class EasySyncPlugin extends Plugin {
       this.status.refresh();
       this.logger.error("reconcile.trigger_failed", error, { trigger });
     });
+  }
+
+  private requestLifecycleConnection(trigger: "online" | "resume"): void {
+    if (this.engine && this.status.connected) {
+      this.reconcileAfter(trigger);
+      return;
+    }
+    if (this.connectionAttempt) return;
+    // A connectivity or resume signal starts a fresh bounded series and can
+    // replace a delayed retry with an immediate attempt.
+    this.resetAutomaticRetries();
+    this.requestAutomaticConnection(trigger);
+  }
+
+  private requestAutomaticConnection(trigger: string): void {
+    if (this.unloading || this.connectionAttempt) return;
+    if (this.retryTimer) return;
+    void this.startConnectionAttempt(trigger);
+  }
+
+  private startConnectionAttempt(trigger: string): Promise<SettingsApplyResult> {
+    if (this.unloading) return Promise.resolve({ kind: "not-configured" });
+    if (this.connectionAttempt) return this.connectionAttempt;
+    if (this.automaticRetryBlocked) {
+      return Promise.resolve({ kind: "connection-error", message: this.status.connectionError });
+    }
+    if (this.automaticAttempts >= EasySyncPlugin.maxAutomaticAttempts) {
+      this.status.retrying = false;
+      this.status.refresh();
+      return Promise.resolve({ kind: "connection-error", message: this.status.connectionError });
+    }
+
+    this.automaticAttempts++;
+    const generation = this.connectionGeneration;
+    this.status.retrying = false;
+    this.status.refresh();
+    const attempt = this.serialize(() => this.connectNowUnlocked());
+    this.connectionAttempt = attempt;
+    void attempt.then((result) => {
+      if (generation !== this.connectionGeneration || this.unloading) return;
+      if (this.status.connectionState === "AUTH_ERROR" || result.kind === "validation-error" || result.kind === "not-configured") {
+        this.automaticRetryBlocked = true;
+        this.automaticAttempts = 0;
+        this.status.retrying = false;
+        this.status.refresh();
+      } else if (result.kind === "connection-error" && this.status.connectionState === "OFFLINE") {
+        this.scheduleAutomaticRetry(generation);
+      } else {
+        this.status.retrying = false;
+        if (result.kind !== "connection-error") this.automaticAttempts = 0;
+        this.status.refresh();
+      }
+      this.logger.debug("plugin.connect.attempt_complete", { trigger, result: result.kind,
+        attempts: this.automaticAttempts });
+    }).finally(() => {
+      if (this.connectionAttempt === attempt) this.connectionAttempt = undefined;
+    });
+    return attempt;
+  }
+
+  private scheduleAutomaticRetry(generation: number): void {
+    if (this.automaticAttempts >= EasySyncPlugin.maxAutomaticAttempts || this.unloading || generation !== this.connectionGeneration) {
+      this.status.retrying = false;
+      this.status.refresh();
+      return;
+    }
+    const delay = Math.min(EasySyncPlugin.retryBaseDelayMs * 2 ** (this.automaticAttempts - 1),
+      EasySyncPlugin.retryDelayCapMs);
+    this.status.retrying = true;
+    this.status.refresh();
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      void this.startConnectionAttempt("retry");
+    }, delay);
+    this.logger.debug("plugin.connect.retry_scheduled", { attempt: this.automaticAttempts + 1, delayMs: delay });
+  }
+
+  private clearRetryTimer(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = undefined;
+  }
+
+  private resetAutomaticRetries(allowBlocked = false): void {
+    this.connectionGeneration++;
+    this.clearRetryTimer();
+    this.automaticAttempts = 0;
+    if (allowBlocked) this.automaticRetryBlocked = false;
+    this.status.retrying = false;
+    this.status.refresh();
   }
 
   private shouldReconcileOnVisibility(): boolean {
@@ -433,7 +546,19 @@ export default class EasySyncPlugin extends Plugin {
   }
 
   async connectNow(): Promise<SettingsApplyResult> {
-    return this.serialize(() => this.connectNowUnlocked());
+    this.resetAutomaticRetries(true);
+    const generation = this.connectionGeneration;
+    return this.serialize(async () => {
+      const result = await this.connectNowUnlocked();
+      if (this.status.connectionState === "AUTH_ERROR" || result.kind === "validation-error" || result.kind === "not-configured") {
+        this.automaticRetryBlocked = true;
+        this.automaticAttempts = 0;
+      } else if (result.kind === "connection-error" && this.status.connectionState === "OFFLINE" && generation === this.connectionGeneration) {
+        this.automaticAttempts = 1;
+        this.scheduleAutomaticRetry(generation);
+      }
+      return result;
+    });
   }
 
   private async connectNowUnlocked(): Promise<SettingsApplyResult> {
@@ -465,8 +590,11 @@ export default class EasySyncPlugin extends Plugin {
       this.status.attachmentState = "CONFIGURATION_ERROR";
       this.status.attachmentError = attachmentError;
     }
+    this.status.value = "INITIALIZING";
     this.status.connectionState = "CONNECTING";
     this.status.connectionError = "";
+    this.status.connected = false;
+    this.status.reconciled = false;
     this.status.refresh();
     await this.disconnect();
     this.status.lastError = "";
@@ -528,9 +656,11 @@ export default class EasySyncPlugin extends Plugin {
     } catch (error) {
       await this.disconnect();
       const message = this.safeDiagnostic(error);
+      const authenticationFailure = /auth|permission|password missing/i.test(String(error));
       this.status.lastError = message;
       this.status.connectionError = message;
-      this.status.connectionState = this.status.value === "AUTH_ERROR" ? "AUTH_ERROR" : "OFFLINE";
+      this.status.connectionState = authenticationFailure ? "AUTH_ERROR" : "OFFLINE";
+      if (authenticationFailure) this.status.value = "AUTH_ERROR";
       this.status.refresh();
       this.logger.error("plugin.connect_failed", error, { vaultId: config.vaultId, bucket: `OBS_${config.vaultId}_FILES`,
         durationMs: Math.round(performance.now() - startedAt) });
