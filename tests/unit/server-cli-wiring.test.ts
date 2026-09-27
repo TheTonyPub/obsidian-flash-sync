@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { BootstrapPlan } from "../../packages/server-cli/src/cli.js";
-import { createBootstrapApply, createHostOptionsAdapter, createVaultUserAdapter, type BootstrapRuntime } from "../../packages/server-cli/src/host-deployment.js";
+import { createBootstrapApply, createHostOptionsAdapter, createSecretOutputAdapter, createVaultUserAdapter, type BootstrapRuntime } from "../../packages/server-cli/src/host-deployment.js";
 import { applyFirewallOption } from "../../packages/server-cli/src/host-options.js";
 import { planBackupSchedule } from "../../packages/server-cli/src/backup.js";
 import type { EndpointReadinessOptions } from "../../packages/server-cli/src/tls.js";
@@ -124,6 +124,67 @@ describe("fos bootstrap deployment wiring", () => {
     await expect(adapter.verifySsh(2222)).resolves.toBe(true);
   });
 
+  it("creates missing dedicated service identities in group-before-user order", async () => {
+    const existing = new Set(["passwd:fos-caddy", "group:fos-caddy"]);
+    const host = runtime({ run: vi.fn().mockImplementation(async (command: readonly string[]) => {
+      if (command[0] === "getent") {
+        if (existing.has(`${command[1]}:${command[2]}`)) return "present";
+        throw new Error("not found");
+      }
+      if (command[0] === "groupadd") existing.add(`group:${command.at(-1)}`);
+      if (command[0] === "useradd") existing.add(`passwd:${command.at(-1)}`);
+      return "";
+    }) });
+    const adapter = createHostOptionsAdapter(host);
+
+    await adapter.createDedicatedIdentity("fos-nats", "fos-nats");
+    await adapter.createDedicatedIdentity("fos-caddy", "fos-caddy");
+
+    const commands = (host.run as ReturnType<typeof vi.fn>).mock.calls.map(([command]) => command);
+    expect(commands).toContainEqual(["groupadd", "--system", "fos-nats"]);
+    expect(commands).toContainEqual(["useradd", "--system", "--gid", "fos-nats", "--no-create-home", "--shell", "/usr/sbin/nologin", "fos-nats"]);
+    expect(commands.some((command) => command[0] === "groupadd" && command.at(-1) === "fos-caddy")).toBe(false);
+    expect(commands.some((command) => command[0] === "useradd" && command.at(-1) === "fos-caddy")).toBe(false);
+    expect(commands.findIndex((command) => command[0] === "groupadd"))
+      .toBeLessThan(commands.findIndex((command) => command[0] === "useradd"));
+  });
+
+  it("writes protected secret output atomically and cleans up if replacement fails", async () => {
+    const secret = "one-time-secret-material";
+    const host = runtime({ rename: vi.fn().mockRejectedValue(new Error("disk full")) });
+    const adapter = createSecretOutputAdapter(host);
+
+    await expect(adapter.writeFileAtomically("/protected/handoff.json", secret, { owner: 0, mode: 0o600 }))
+      .rejects.toThrow("disk full");
+
+    const [temporaryPath] = (host.writeText as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(temporaryPath).toMatch(/^\/protected\/.handoff\.json\..+\.tmp$/);
+    expect(host.writeText).toHaveBeenCalledWith(temporaryPath, secret, 0o600);
+    expect(host.rename).toHaveBeenCalledWith(temporaryPath, "/protected/handoff.json");
+    expect(host.remove).toHaveBeenCalledWith(temporaryPath);
+  });
+
+  it("commits protected secret output with an atomic rename", async () => {
+    const host = runtime();
+    const adapter = createSecretOutputAdapter(host);
+
+    await adapter.writeFileAtomically("/protected/handoff.json", "secret", { owner: 0, mode: 0o600 });
+
+    const [temporaryPath] = (host.writeText as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(host.writeText).toHaveBeenCalledWith(temporaryPath, "secret", 0o600);
+    expect(host.rename).toHaveBeenCalledWith(temporaryPath, "/protected/handoff.json");
+    expect(host.remove).not.toHaveBeenCalled();
+  });
+
+  it("does not write secret output through a symlink target", async () => {
+    const host = runtime({ pathInfo: vi.fn().mockResolvedValue({ isFile: false, isSymbolicLink: true, uid: 0, mode: 0o777 }) });
+    const adapter = createSecretOutputAdapter(host);
+
+    await expect(adapter.writeFileAtomically("/protected/handoff.json", "secret", { owner: 0, mode: 0o600 }))
+      .rejects.toThrow("RESOURCE_CONFLICT");
+    expect(host.writeText).not.toHaveBeenCalled();
+  });
+
   it("runs the selected backend then verifies the published WSS endpoint", async () => {
     const host = runtime();
 
@@ -131,6 +192,41 @@ describe("fos bootstrap deployment wiring", () => {
 
     expect(host.run).toHaveBeenCalledWith(["docker", "compose", "-p", "flash-osidian-sync", "-f", "/opt/flash-osidian-sync/compose.yaml", "up", "-d"]);
     expect(host.verifyWss).toHaveBeenCalledWith("wss://sync.example.test", expect.any(Number));
+  });
+
+  it("routes Podman deployments through podman-compose before endpoint verification", async () => {
+    const host = runtime({ run: vi.fn().mockImplementation(async (command: readonly string[]) => {
+      if (command[0] === "podman" && command[1] === "--version") return "podman version 5.0.2";
+      if (command[0] === "podman-compose") return "podman-compose version 1.0.6";
+      return "";
+    }) });
+
+    await createBootstrapApply(host)({ ...plan, mode: "podman" });
+
+    expect(host.run).toHaveBeenCalledWith(["podman-compose", "-p", "flash-osidian-sync", "-f",
+      "/opt/flash-osidian-sync/compose.yaml", "config"]);
+    expect(host.run).toHaveBeenCalledWith(["podman-compose", "-p", "flash-osidian-sync", "-f",
+      "/opt/flash-osidian-sync/compose.yaml", "up", "-d"]);
+    expect(host.verifyWss).toHaveBeenCalledWith("wss://sync.example.test", expect.any(Number));
+  });
+
+  it("cleans Podman configuration after startup failure without probing the public endpoint", async () => {
+    const host = runtime({ run: vi.fn().mockImplementation(async (command: readonly string[]) => {
+      if (command[0] === "podman" && command[1] === "--version") return "podman version 5.0.2";
+      if (command[0] === "podman-compose" && command[1] === "--version") return "podman-compose version 1.0.6";
+      if (command[0] === "podman-compose" && command.includes("up")) throw new Error("podman startup failed");
+      return "";
+    }) });
+
+    await expect(createBootstrapApply(host)({ ...plan, mode: "podman" })).rejects.toThrow("podman startup failed");
+
+    expect(host.verifyCertificate).not.toHaveBeenCalled();
+    expect(host.verifyWss).not.toHaveBeenCalled();
+    expect(host.run).toHaveBeenCalledWith(["podman-compose", "-p", "flash-osidian-sync", "-f",
+      "/opt/flash-osidian-sync/compose.yaml", "down"]);
+    expect(host.remove).toHaveBeenCalledWith(`${plan.installPath}/nats-server.conf`);
+    expect(host.remove).toHaveBeenCalledWith(`${plan.installPath}/Caddyfile`);
+    expect(host.remove).toHaveBeenCalledWith(`${plan.installPath}/compose.yaml`);
   });
 
   it("does not report success when endpoint verification fails", async () => {
@@ -160,6 +256,49 @@ describe("fos bootstrap deployment wiring", () => {
       action: "verify", username: "fos-vault-notes", password: "vault-secret", vaultId: "notes",
     });
     expect(JSON.parse(verifyCall?.[1] as string).crossVaultId).toBeUndefined();
+    const hostCommands = (host.run as ReturnType<typeof vi.fn>).mock.calls.map(([command]) => command.join(" ")).join("\n");
+    const hostFiles = (host.writeText as ReturnType<typeof vi.fn>).mock.calls.map(([, contents]) => contents).join("\n");
+    expect(hostCommands).not.toContain("admin-secret");
+    expect(hostCommands).not.toContain("vault-secret");
+    expect(hostFiles).not.toContain("admin-secret");
+    expect(hostFiles).not.toContain("vault-secret");
+    for (const [command] of (host.runWithInput as ReturnType<typeof vi.fn>).mock.calls) {
+      expect(command.join(" ")).not.toContain("admin-secret");
+      expect(command.join(" ")).not.toContain("vault-secret");
+    }
+  });
+
+  it("fails closed when Compose administrator input cannot be streamed", async () => {
+    const host = runtime();
+    const credentials = {
+      administrator: { username: "fos-admin", password: "admin-secret", passwordHash: "admin-hash" },
+      vault: { username: "fos-vault-notes", password: "vault-secret", passwordHash: "vault-hash" },
+    };
+
+    await expect(createBootstrapApply(host)(plan, credentials)).rejects.toThrow("FIRST_BUCKET_PROVISIONING_FAILED");
+    expect(host.verifyWss).toHaveBeenCalledWith("wss://sync.example.test", expect.any(Number));
+    const hostCommands = (host.run as ReturnType<typeof vi.fn>).mock.calls.map(([command]) => command.join(" ")).join("\n");
+    expect(hostCommands).not.toContain("admin-secret");
+    expect(hostCommands).not.toContain("vault-secret");
+    expect(host.writeText).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining("admin-secret"), expect.any(Number));
+    expect(host.writeText).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining("vault-secret"), expect.any(Number));
+  });
+
+  it("propagates selected backend failure without endpoint verification", async () => {
+    const host = runtime({ run: vi.fn().mockImplementation(async (command: readonly string[]) => {
+      if (command[0] === "docker" && command[1] === "compose" && command.includes("up")) {
+        throw new Error("compose deployment failed");
+      }
+      if (command[0] === "docker" && command[1] === "--version") return "Docker version 27.0.0";
+      if (command[0] === "docker" && command[1] === "compose") return "Docker Compose version v2.29.0";
+      return "";
+    }) });
+
+    await expect(createBootstrapApply(host)(plan)).rejects.toThrow("compose deployment failed");
+    expect(host.verifyCertificate).not.toHaveBeenCalled();
+    expect(host.verifyWss).not.toHaveBeenCalled();
+    expect(host.run).toHaveBeenCalledWith(["docker", "compose", "-p", "flash-osidian-sync", "-f",
+      "/opt/flash-osidian-sync/compose.yaml", "down"]);
   });
 
   it("blocks successful bootstrap when first-vault scoped verification fails", async () => {

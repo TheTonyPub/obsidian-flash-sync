@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:coverage": "vitest run tests/unit --coverage",
+    "test:coverage:aggregate": "vitest run tests/unit tests/integration tests/simulation --coverage --coverage.reportsDirectory coverage/aggregate",
     "test:integration": "vitest run tests/integration --exclude tests/integration/server-cli-bundle.test.ts --passWithNoTests",
     "test:simulation": "vitest run tests/simulation --passWithNoTests",
     "benchmark:kv-discovery": "vitest run tests/benchmark/kv-discovery.bench.test.ts"

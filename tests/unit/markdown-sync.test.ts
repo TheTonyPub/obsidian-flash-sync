@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canonicalizeRemotePath, decodeRecord, encodePathOwnershipRecord, encodeRecord, pathOwnershipKey, sha256Hex } from "../../packages/protocol/src/index.js";
+import { canonicalizeRemotePath, decodeRecord, encodePathOwnershipRecord, encodeRecord, pathOwnershipKey, sha256Hex,
+  type RemoteFileRecord } from "../../packages/protocol/src/index.js";
 import { MarkdownSyncEngine } from "../../packages/plugin/src/markdown-sync.js";
 import { LocalStore } from "../../packages/plugin/src/local-store.js";
 import { SyncStatus } from "../../packages/plugin/src/connection.js";
@@ -486,5 +487,59 @@ describe("inline Markdown sync", () => {
     expect(pending.find((item) => item.operationId === "dependent-rename-b")?.predecessorOperationId).toBe(deleteOperationId);
     kv.update = update as typeof kv.update;
     a.engine.stop(); a.store.close();
+  });
+});
+
+describe("live blob delivery", () => {
+  it("retries a failed watched blob revision without advancing state or writing twice", async () => {
+    const kv = new NatsKvDouble();
+    const vault = new VaultDouble();
+    const store = await LocalStore.open(`blob-watch-${crypto.randomUUID()}`, indexedDBDouble.indexedDB);
+    const status = new SyncStatus();
+    const bytes = new TextEncoder().encode("remote attachment");
+    let listener: ((entry: { key: string; value: Uint8Array; revision: number }) => void) | undefined;
+    kv.watch = (next) => { listener = next; return () => {}; };
+    let downloads = 0;
+    const engine = new MarkdownSyncEngine({ deviceId: "device-b", vault, store, kv, status,
+      blob: { upload: async () => {}, download: async () => {
+        downloads++;
+        if (downloads === 1) throw new Error("temporary S3 failure");
+        return bytes;
+      } },
+    });
+    const record: RemoteFileRecord = { schemaVersion: 1, fileId: "blob-file", path: "images/photo.png", kind: "blob",
+      deleted: false, contentHash: sha256Hex(bytes), size: bytes.length,
+      blob: { algorithm: "sha256", hash: sha256Hex(bytes), key: "vaults/VAULT/blobs/photo", size: bytes.length },
+      origin: { deviceId: "device-a", operationId: "blob-create", clientTime: 1 } };
+    const entry = { key: "f.blob-file", value: encodeRecord(record), revision: 7 };
+
+    try {
+      await engine.start();
+      expect(listener).toBeDefined();
+      listener!(entry);
+      await eventually(() => downloads === 1);
+      await engine.settle();
+
+      expect(await store.getFile("blob-file")).toBeUndefined();
+      expect(vault.read("images/photo.png")).toBeUndefined();
+      expect(vault.events.filter((event) => event.type === "modify")).toHaveLength(0);
+
+      listener!(entry);
+      await eventually(() => {
+        const applied = vault.read("images/photo.png");
+        return !!applied && sha256Hex(applied) === sha256Hex(bytes);
+      });
+      await engine.settle();
+      expect((await store.getFile("blob-file"))?.remoteRevision).toBe(7);
+      expect(vault.events.filter((event) => event.type === "modify")).toHaveLength(1);
+
+      listener!(entry);
+      await engine.settle();
+      expect(downloads).toBe(2);
+      expect(vault.events.filter((event) => event.type === "modify")).toHaveLength(1);
+    } finally {
+      engine.stop();
+      store.close();
+    }
   });
 });
