@@ -68,6 +68,32 @@ describe("NATS connection", () => {
     expect(peak).toBe(8);
   });
 
+  it("delegates versioned KV operations and reports the smallest configured payload limit", async () => {
+    const value = new Uint8Array([3, 4]);
+    const kv = {
+      get: vi.fn().mockResolvedValue({ value, revision: 11 }),
+      put: vi.fn().mockResolvedValue(12),
+      create: vi.fn().mockResolvedValue(13),
+      update: vi.fn().mockResolvedValue(14),
+    } as unknown as KV;
+    const connection = { info: { max_payload: 96 }, close: vi.fn().mockResolvedValue(undefined) } as unknown as NatsConnection;
+    const adapter = new NatsKvAdapter(kv, connection, 64);
+
+    expect(adapter.maxValueBytes).toBe(64);
+    expect(await adapter.get("f.file")).toEqual({ value, revision: 11 });
+    expect(await adapter.put("f.file", value)).toBe(12);
+    expect(await adapter.create("f.new", value)).toBe(13);
+    expect(await adapter.update("f.file", value, 11)).toBe(14);
+    expect(kv.get).toHaveBeenCalledWith("f.file");
+    expect(kv.put).toHaveBeenCalledWith("f.file", value);
+    expect(kv.create).toHaveBeenCalledWith("f.new", value);
+    expect(kv.update).toHaveBeenCalledWith("f.file", value, 11);
+
+    await adapter.close();
+    expect(connection.close).toHaveBeenCalledOnce();
+    expect(new NatsKvAdapter(kv, { info: {} } as NatsConnection).maxValueBytes).toBe(512 * 1024);
+  });
+
   it("reads password from SecretStorage and opens only configured bucket", async () => {
     const secrets = new SecretStorageDouble();
     await secrets.setSecret("nats-A", "strong-a");

@@ -15,7 +15,7 @@ const remote = (fileId: string, path: string, content: string): RemoteFileRecord
   contentHash: sha256Hex(bytes(content)), size: bytes(content).length, content,
   origin: { deviceId: "other-device", operationId: `op-${fileId}`, clientTime: 1 },
 });
-async function setup(localFiles: Record<string, string>, remoteFiles: RemoteFileRecord[]) {
+async function setup(localFiles: Record<string, string>, remoteFiles: RemoteFileRecord[], blob?: { upload(key: string, bytes: Uint8Array): Promise<void>; download(key: string): Promise<Uint8Array> }) {
   const kv = new NatsKvDouble();
   const vault = new VaultDouble();
   for (const [path, value] of Object.entries(localFiles)) vault.write(path, bytes(value));
@@ -27,7 +27,7 @@ async function setup(localFiles: Record<string, string>, remoteFiles: RemoteFile
   }
   const store = await LocalStore.open(`bootstrap-${crypto.randomUUID()}`, indexedDBDouble.indexedDB);
   const status = new SyncStatus();
-  const engine = new MarkdownSyncEngine({ deviceId: "local-device", kv, vault, store, status });
+  const engine = new MarkdownSyncEngine({ deviceId: "local-device", kv, vault, store, status, blob });
   return { kv, vault, store, status, engine };
 }
 
@@ -73,6 +73,54 @@ describe("conservative bootstrap", () => {
     await state.engine.reconcile();
     expect(state.vault.files.size).toBe(2);
     expect(text(state.vault, conflictPath)).toBe("local");
+    state.engine.stop(); state.store.close();
+  });
+
+  it("keeps an occupied binary bootstrap copy untouched when its bytes differ", async () => {
+    const local = new Uint8Array([1, 2, 3]);
+    const incoming = new Uint8Array([4, 5, 6]);
+    const blobKey = "vaults/VAULT/blobs/asset";
+    const record: RemoteFileRecord = { schemaVersion: 1, fileId: "remote-blob", path: "images/photo.png", kind: "blob",
+      deleted: false, contentHash: sha256Hex(incoming), size: incoming.length,
+      blob: { algorithm: "sha256", hash: sha256Hex(incoming), key: blobKey, size: incoming.length },
+      origin: { deviceId: "other-device", operationId: "blob-create", clientTime: 1 } };
+    let downloads = 0;
+    const state = await setup({}, [record], { upload: async () => {}, download: async () => { downloads++; return incoming; } });
+    const copyPath = "images/photo.conflict-remote-blob.png";
+    state.vault.write("images/photo.png", local);
+    state.vault.write(copyPath, new Uint8Array([9, 8, 7]));
+    state.vault.events.length = 0;
+
+    await state.engine.start();
+
+    expect([...state.vault.read("images/photo.png")!]).toEqual([...local]);
+    expect([...state.vault.read(copyPath)!]).toEqual([9, 8, 7]);
+    expect(await state.store.getFile("remote-blob")).toBeUndefined();
+    expect(downloads).toBe(0);
+    expect(state.vault.events).toEqual([]);
+    state.engine.stop(); state.store.close();
+  });
+
+  it("records a binary bootstrap conflict without rewriting an identical existing copy", async () => {
+    const local = new Uint8Array([1, 2, 3]);
+    const incoming = new Uint8Array([4, 5, 6]);
+    const record: RemoteFileRecord = { schemaVersion: 1, fileId: "remote-blob", path: "images/photo.png", kind: "blob",
+      deleted: false, contentHash: sha256Hex(incoming), size: incoming.length,
+      blob: { algorithm: "sha256", hash: sha256Hex(incoming), key: "vaults/VAULT/blobs/asset", size: incoming.length },
+      origin: { deviceId: "other-device", operationId: "blob-create", clientTime: 1 } };
+    const state = await setup({}, [record], { upload: async () => {}, download: async () => incoming });
+    const copyPath = "images/photo.conflict-remote-blob.png";
+    state.vault.write("images/photo.png", local);
+    state.vault.write(copyPath, local);
+    state.vault.events.length = 0;
+
+    await state.engine.start();
+
+    expect([...state.vault.read("images/photo.png")!]).toEqual([...incoming]);
+    expect([...state.vault.read(copyPath)!]).toEqual([...local]);
+    expect((await state.store.getFile("remote-blob"))?.remoteRevision).toBeGreaterThan(0);
+    expect(state.vault.events.filter((event) => event.type === "modify")).toEqual([{ type: "modify", path: "images/photo.png" }]);
+    expect((await state.store.conflicts()).map((conflict) => conflict.copyPath)).toEqual([copyPath]);
     state.engine.stop(); state.store.close();
   });
 });

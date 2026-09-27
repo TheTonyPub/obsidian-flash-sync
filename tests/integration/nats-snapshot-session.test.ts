@@ -66,6 +66,35 @@ async function withAdapter(run: (adapter: NatsKvAdapter, kv: Awaited<ReturnType<
 const integration = describe.skipIf(!externalUrl && !executable);
 
 integration("NATS KV snapshot session", () => {
+  it("exposes get, list, create, update, and live watch through the adapter", async () => {
+    await withAdapter(async (adapter, kv) => {
+      const first = new TextEncoder().encode("first");
+      const createdRevision = await adapter.create("f.contract", first);
+      expect((await adapter.get("f.contract"))?.revision).toBe(createdRevision);
+      expect(new TextDecoder().decode((await adapter.get("f.contract"))!.value)).toBe("first");
+
+      await expect(adapter.create("f.contract", first)).rejects.toThrow();
+      const updatedRevision = await adapter.update("f.contract", new TextEncoder().encode("updated"), createdRevision);
+      expect(updatedRevision).toBeGreaterThan(createdRevision);
+      expect(new TextDecoder().decode((await adapter.get("f.contract"))!.value)).toBe("updated");
+      expect(await adapter.get("f.missing")).toBeNull();
+      expect((await adapter.list()).map((entry) => entry.key)).toEqual(["f.contract"]);
+      expect(adapter.maxValueBytes).toBeGreaterThan(0);
+
+      const watched: Array<{ key: string; value: string; revision: number }> = [];
+      const stop = await adapter.watch((entry) => watched.push({ key: entry.key,
+        value: new TextDecoder().decode(entry.value), revision: entry.revision }));
+      await eventually(async () => watched.some((entry) => entry.key === "f.contract"));
+      watched.length = 0;
+      await kv.put("f.watched", new TextEncoder().encode("live"));
+      await eventually(async () => watched.some((entry) => entry.key === "f.watched"));
+      const live = watched.find((entry) => entry.key === "f.watched")!;
+      expect(live.value).toBe("live");
+      expect(live.revision).toBeGreaterThan(updatedRevision);
+      stop();
+    });
+  }, 15000);
+
   it("emits current values and tombstones, continues live, and deletes its ephemeral consumer", async () => {
     await withAdapter(async (adapter, kv, _url, bucket) => {
       const liveValue = new TextEncoder().encode("current value");

@@ -2,9 +2,9 @@ import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
 import { createServer } from "node:net";
 import { afterAll, describe, expect, it } from "vitest";
-import { CreateBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { decodeRecord, encodeRecord, sha256Hex } from "../../packages/protocol/src/index.js";
-import { connectS3Blob } from "../../packages/plugin/src/blob-storage.js";
+import { connectS3Blob, downloadVerified } from "../../packages/plugin/src/blob-storage.js";
 import { SyncStatus } from "../../packages/plugin/src/connection.js";
 import { LocalStore } from "../../packages/plugin/src/local-store.js";
 import { MarkdownSyncEngine } from "../../packages/plugin/src/markdown-sync.js";
@@ -88,6 +88,16 @@ describe("disposable S3-compatible blob integration", () => {
     const blob = await connectS3Blob({ endpoint, bucket: "easy-sync-test", region: "us-east-1",
       accessKeyId: "testadmin", secretKeySecretKey: "secret", allowHttpForTests: true },
     { getSecret: async () => "testpassword123" });
+    const directPayload = new Uint8Array([4, 5, 0, 255]);
+    await blob.upload("adapter-contract/direct.bin", directPayload);
+    expect(await blob.download("adapter-contract/direct.bin")).toEqual(directPayload);
+    await expect(blob.download("adapter-contract/missing.bin")).rejects.toThrow();
+    await client.send(new PutObjectCommand({ Bucket: "easy-sync-test", Key: "adapter-contract/corrupt.bin",
+      Body: new Uint8Array([9, 8, 7]) }));
+    await expect(downloadVerified(blob, { algorithm: "sha256", hash: sha256Hex(directPayload),
+      key: "adapter-contract/corrupt.bin", size: directPayload.length })).rejects.toThrow(/size mismatch|hash mismatch/i);
+    expect((await client.send(new GetObjectCommand({ Bucket: "easy-sync-test", Key: "adapter-contract/direct.bin" })))
+      .ContentType).toBe("application/octet-stream");
     const kv = new NatsKvDouble();
     async function replica(id: string) {
       const vault = new VaultDouble();
