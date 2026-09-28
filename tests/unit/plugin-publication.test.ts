@@ -81,6 +81,20 @@ async function publish(fixture: ReturnType<typeof apiFixture>, overrides = {}) {
 }
 
 describe("verified artifact publication", () => {
+  it("allows GitHub commit comparison routes while refusing path traversal", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const api = publication.createGitHubApi("fixture-token");
+      const comparison = `/repos/owner/repo/compare/${commit}...refs%2Fheads%2Frelease%2F1.2.3`;
+      await expect(api.json("GET", comparison)).resolves.toEqual({});
+      expect(fetch).toHaveBeenCalledWith(`https://api.github.com${comparison}`, expect.objectContaining({ method: "GET", redirect: "manual" }));
+      for (const path of ["/repos/../repo", "/repos/owner/%2e%2e/repo", "/repos/owner/a%2F..%2Fb"])
+        await expect(api.json("GET", path)).rejects.toThrow("Invalid GitHub API path");
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("publishes exact candidate files, then repeats without mutations", async () => {
     const fixture = apiFixture();
     await publish(fixture);

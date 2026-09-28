@@ -189,7 +189,8 @@ export function createGitHubApi(token) {
   requireMatch(typeof token === "string" && token.length > 0, "Missing GitHub publication token");
   const headers = { Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "flash-sync-publication" };
   async function request(method, path, body, accept = "application/vnd.github+json") {
-    requireMatch(path.startsWith("/repos/") && !path.includes(".."), "Invalid GitHub API path");
+    const segments = decodeURIComponent(path.split("?")[0]).split("/");
+    requireMatch(path.startsWith("/repos/") && !segments.some(segment => segment === "." || segment === ".."), "Invalid GitHub API path");
     const response = await globalThis.fetch(`https://api.github.com${path}`, { method, headers: { ...headers, Accept: accept, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body), redirect: "manual", signal: globalThis.AbortSignal.timeout(60000) });
     if (!response.ok && response.status !== 302) throw Object.assign(new Error(`GitHub ${method} ${path} failed (${response.status})`), { status: response.status });
