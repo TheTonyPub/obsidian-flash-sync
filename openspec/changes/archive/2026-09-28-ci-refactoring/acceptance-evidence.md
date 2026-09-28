@@ -158,4 +158,10 @@ The [repeat run](https://github.com/TheTonyPub/obsidian-flash-sync/actions/runs/
 - Real artifact expiry/deletion and corrupt provenance were not induced; the rejection fixtures cover them. Actual 90-day retention and legitimate provenance were verified on GitHub.
 - Pinned v4 actions emitted Node.js 20 deprecation annotations while GitHub forced their action runtime to Node.js 24. The configured test/build Node.js 22 runtime and all checks passed; major action upgrades remain follow-up work.
 
-Main OpenSpec specs remain unsynced and the change remains active, ready for separate review/archive.
+## Closure
+
+On 2026-09-28, the owner authorized spec synchronization, archiving, and integration into `dev`. The `plugin-release-distribution` main spec now contains all three modified and three added requirements. Semantic comparison verified all six requirements and 28 complete scenario bodies, with the existing Purpose, prior scenarios, and stable-acceptance boundary preserved. Strict main-spec validation passed 15/15.
+
+All planning artifacts and 28/28 tasks are complete. The change is archived at `openspec/changes/archive/2026-09-28-ci-refactoring/`. Stable publication and immutable-release behavior retain the explicitly documented verification limits above; archive closure does not claim additional live acceptance.
+
+The post-archive `openspec validate --all --strict` check reports 15 passing main specs and one failure in the unrelated, unchanged `remote-ssh-server-bootstrap` draft: it has no delta specs. That draft remains active and outside this closure; its incomplete planning is not marked accepted or repaired by this change. A disposable repository-root fixture containing the archived change and updated main spec passed `openspec validate --all --strict` for both items (2/2).
