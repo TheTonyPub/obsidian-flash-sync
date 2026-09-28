@@ -40,7 +40,10 @@ rules:
   tasks:
     - "Order work by TDD: requirement-derived failing tests, minimal implementation, then verification."
     - Keep tasks plugin-focused; GitHub Actions are allowed, deployment automation is not.
-    - Assign gpt-5.6-terra medium to architecture/proposal work, gpt-5.6-terra low to implementation, and gpt-5.6-luna medium to tests.
+    - "Use gpt-6-sol with medium reasoning as the default owner for architecture, implementation, tests, documentation, verification, and final review."
+    - "When delegation has a clear benefit, use gpt-6-luna with medium reasoning for bounded exploration, test design, routine verification, and documentation; use gpt-6-luna with high reasoning for bounded implementation including tests and related documentation."
+    - "Keep one implementation owner per coherent feature and reuse that owner across tests, code, and documentation. Do not create agents per checkbox or TDD phase. Model choices belong in Codex configuration and agent profiles; task metadata does not switch the active model."
+    - "Keep implementation with the primary Sol/medium owner when it can complete the work. Delegate only for a concrete benefit, such as independent work that reduces total cost or elapsed time; a cheaper available model or task label alone is not a reason to delegate."
     - Add short NATS KV configuration documentation before an MVP release candidate.
 
 operations:
