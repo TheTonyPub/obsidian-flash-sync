@@ -1,6 +1,6 @@
 import { commitOwnedState, prepareOwnedState, readOwnedStatus, type OwnedStateAdapter, type OwnedStatus, type StateReconciliation } from "./state.js";
 import { createCredentialHandoff, generateBootstrapCredentials, type BootstrapCredentials, type SecretOutputAdapter } from "./credentials.js";
-import { addVaultUser, revokeVaultUser, rotateVaultUser, type VaultUserAdapter } from "./vault-users.js";
+import { addVaultUser, inspectVaultUser, revokeVaultUser, rotateVaultUser, type VaultUserAdapter } from "./vault-users.js";
 import { createVault, inspectVault, listVaults, type VaultAdminAdapter, type VaultBucket, type VaultCreateResult } from "./vault-admin.js";
 import { verifyVault, type VaultVerificationAdapter } from "./vault-verify.js";
 import { planHostOptions, type HostOptions } from "./host-options.js";
@@ -9,6 +9,7 @@ import { previewLifecycle, runLifecycle, type LifecycleAdapter } from "./lifecyc
 import { previewUpgrade, runUpgrade, type UpgradeAdapter } from "./upgrade.js";
 import { type HandoffConfig, type HandoffResult } from "./handoff-builder.js";
 import type { CredentialRecord, CredentialStore } from "./credential-store.js";
+import type { CliPrompts } from "./prompts.js";
 
 export type InstallMode = "native" | "docker" | "podman";
 
@@ -60,6 +61,7 @@ export interface BootstrapPlan {
 
 export interface RunBootstrapOptions {
   host: HostAdapter;
+  prompts?: CliPrompts;
   prompt?: (question: string) => Promise<string>;
   showPreview?: (preview: string) => Promise<void> | void;
   state?: OwnedStateAdapter;
@@ -82,6 +84,9 @@ type VaultAction = "add" | "rotate" | "revoke" | "create" | "list" | "inspect" |
 
 export interface RunVaultCommandOptions {
   host: HostAdapter;
+  prompts?: CliPrompts;
+  showReview?: (review: string) => Promise<void> | void;
+  json?: boolean;
   resolveMode?: () => Promise<InstallMode | undefined>;
   createAdapter(plan: BootstrapPlan): VaultUserAdapter;
   createAdminAdapter?(plan: BootstrapPlan, administrator: { username: string; password: string }): VaultAdminAdapter;
@@ -126,6 +131,10 @@ const supportedPlatforms: Record<string, readonly string[]> = {
 };
 const domainPattern = /^(?=.{1,253}$)(?=.{1,63}(?:\.|$))[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 const vaultPattern = /^[A-Za-z0-9_-]+$/;
+export const validateDomain = (value: string): true | string => domainPattern.test(value) || "Enter a valid endpoint domain.";
+export const validateVaultId = (value: string): true | string => vaultPattern.test(value) || "Use letters, digits, underscores, or hyphens.";
+export const validateEmail = (value: string): true | string => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || "Enter a valid email or leave empty.";
+export const validatePhrase = (value: string): true | string => !value || value.length >= 8 || "Use at least 8 characters or leave empty for plaintext.";
 const legacyManagedPaths = [
   "/etc/easy-sync-server",
   "/opt/easy-sync-server",
@@ -263,6 +272,7 @@ export async function buildBootstrapPlan(request: BootstrapRequest, host: HostAd
   if (!request.domain || !domainPattern.test(request.domain)) throw failure("DOMAIN_REQUIRED");
   if (!request.vaultId || !vaultPattern.test(request.vaultId)) throw failure("VAULT_ID_REQUIRED");
   if (!request.mode || !["native", "docker", "podman"].includes(request.mode)) throw failure("MODE_REQUIRED");
+  if (request.email !== undefined && validateEmail(request.email) !== true) throw failure("EMAIL_INVALID");
   if (host.pathExists && (await Promise.all(legacyManagedPaths.map((path) => host.pathExists!(path)))).some(Boolean)) {
     throw failure("LEGACY_MANAGED_PATH_EXISTS");
   }
@@ -304,6 +314,31 @@ async function collectInteractive(request: BootstrapRequest, prompt: NonNullable
     vaultId: request.vaultId ?? (await prompt("Initial vault ID: ")).trim(),
     manageFirewall: request.manageFirewall || await yes("Manage UFW firewall rules? (yes/no): "),
     dedicatedServiceAccounts: request.dedicatedServiceAccounts || await yes("Create dedicated fos service accounts? (yes/no): "),
+  };
+}
+
+async function collectGuidedBootstrap(request: BootstrapRequest, prompts: CliPrompts): Promise<BootstrapRequest> {
+  if (request.mode !== undefined && !["native", "docker", "podman"].includes(request.mode)) throw failure("MODE_REQUIRED");
+  if (request.domain !== undefined && validateDomain(request.domain) !== true) throw failure("DOMAIN_REQUIRED");
+  if (request.vaultId !== undefined && validateVaultId(request.vaultId) !== true) throw failure("VAULT_ID_REQUIRED");
+  if (request.email !== undefined && validateEmail(request.email) !== true) throw failure("EMAIL_INVALID");
+  return { ...request,
+    mode: request.mode ?? await prompts.select<InstallMode>("Installation mode", [
+      { value: "native", label: "Native", description: "NATS and Caddy through systemd" },
+      { value: "docker", label: "Docker Compose", description: "Services in Docker containers" },
+      { value: "podman", label: "Podman Compose", description: "Services in Podman containers" },
+    ]),
+    domain: request.domain ?? await prompts.input("Endpoint domain", { validate: validateDomain }),
+    email: request.email ?? await prompts.input("ACME email (optional)", { validate: validateEmail }),
+    vaultId: request.vaultId ?? await prompts.input("Initial vault ID", { validate: validateVaultId }),
+    manageFirewall: request.manageFirewall || (await prompts.select("Manage UFW firewall rules?", [
+      { value: "no", label: "Manual", description: "Keep firewall management with the operator" },
+      { value: "yes", label: "Manage UFW", description: "Allow HTTPS and preserve SSH access" },
+    ], "no")) === "yes",
+    dedicatedServiceAccounts: request.dedicatedServiceAccounts || (await prompts.select("Service accounts", [
+      { value: "no", label: "Existing accounts", description: "Require existing fos-nats service accounts" },
+      { value: "yes", label: "Create dedicated accounts", description: "Create accounts owned by the managed installation" },
+    ], "no")) === "yes",
   };
 }
 
@@ -356,14 +391,17 @@ export async function runBootstrap(args: string[], options: RunBootstrapOptions)
   if (request.nonInteractive) {
     request = await collectUnattended(request, options.host);
   } else {
-    if (!options.prompt) throw failure("INTERACTIVE_PROMPT_REQUIRED");
-    request = await collectInteractive(request, options.prompt);
+    if (options.prompts) request = await collectGuidedBootstrap(request, options.prompts);
+    else if (options.prompt) request = await collectInteractive(request, options.prompt);
+    else if (request.command !== "plan") throw failure("NONINTERACTIVE_INPUT_REQUIRED");
+    else if (!request.mode || !request.domain || !request.vaultId) throw failure("PLAN_INPUT_REQUIRED");
   }
   const plan = await buildBootstrapPlan(request, options.host);
   if (request.command === "plan") return { preview: plan.preview, applied: false };
   if (!request.nonInteractive) {
     await options.showPreview?.(plan.preview);
-    request.approve = (await options.prompt!("Apply this plan? (yes/no): ")).trim().toLowerCase() === "yes";
+    request.approve = options.prompts ? await options.prompts.confirm("Apply this plan?")
+      : (await options.prompt!("Apply this plan? (yes/no): ")).trim().toLowerCase() === "yes";
   }
   if (!request.approve) return { preview: plan.preview, applied: false };
   if (!options.apply) throw failure("APPLY_ADAPTER_REQUIRED");
@@ -467,7 +505,7 @@ async function protectedSecret(options: RunVaultCommandOptions, path: string | u
     if (!input.content.trim()) throw failure(`${code}_INPUT_REQUIRED`);
     return input.content.trim();
   }
-  if (!options.promptSecret) throw failure(`${code}_INPUT_REQUIRED`);
+  if (options.unattended || options.json || !options.promptSecret) throw failure(`${code}_INPUT_REQUIRED`);
   const value = await options.promptSecret(prompt);
   if (!value) throw failure(`${code}_INPUT_REQUIRED`);
   return value;
@@ -535,21 +573,22 @@ export async function runVaultCommand(args: string[], options: RunVaultCommandOp
   validateVaultOptions(args, action);
   const requestedMode = vaultOption(args, "--mode") as InstallMode | undefined;
   const mode = requestedMode ?? await options.resolveMode?.();
-  const vaultId = vaultOption(args, "--vault-id");
+  let vaultId = vaultOption(args, "--vault-id");
   const input = vaultOption(args, "--admin-input");
   const vaultInput = vaultOption(args, "--vault-input");
   const crossVaultId = vaultOption(args, "--cross-vault-id");
   const output = vaultOption(args, "--secrets-output");
   const endpointOption = vaultOption(args, "--wss-endpoint");
   const keep = args.includes("--keep");
+  const guided = !options.unattended && !options.json && options.prompts;
+  if (options.json && (action === "add" || action === "rotate") && !output) throw failure("VAULT_SECRETS_OUTPUT_REQUIRED");
   if (!mode) throw failure("INSTALL_MODE_REQUIRED");
   if (mode !== "native" && mode !== "docker" && mode !== "podman") throw failure("INVALID_MODE");
-  if (action !== "list" && !vaultId) throw failure("VAULT_ID_REQUIRED");
+  if (action === "add" && !vaultId && guided) vaultId = await guided.input("Vault ID", { validate: validateVaultId });
+  if (action !== "list" && (!vaultId || validateVaultId(vaultId) !== true)) throw failure("VAULT_ID_REQUIRED");
   const plan = vaultPlan(mode, vaultId ?? "list");
   const handoffEndpoint = action === "add" || action === "rotate" ? await resolveVaultEndpoint(endpointOption, options) : undefined;
   if ((action === "add" || action === "rotate") && !options.createVerificationAdapter) throw failure("VAULT_VERIFICATION_ADAPTER_REQUIRED");
-  const encryptionPhrase = action === "add" || action === "rotate"
-    ? await handoffPhrase(options.promptEncryptionPhrase, !!input || !!options.unattended) : "";
   if (action === "verify") {
     if (crossVaultId !== undefined) {
       if (!options.createAdminAdapter) throw failure("VAULT_ADMIN_ADAPTER_REQUIRED");
@@ -577,9 +616,27 @@ export async function runVaultCommand(args: string[], options: RunVaultCommandOp
   const adapter = options.createAdapter(plan);
   const target = vaultId!;
   if (action === "revoke") { await revokeVaultUser(adapter, administrator, target); await removeVault(options.credentialStore, target); return undefined; }
+  const adminAdapter = action === "add" && options.createAdminAdapter?.(plan, administrator);
+  if (action === "add") {
+    const existingUser = await inspectVaultUser(adapter, administrator, target);
+    if (existingUser) { await options.showReview?.("Vault user already exists. No credentials changed."); return; }
+    if (adminAdapter) await inspectVault(adminAdapter, administrator, target);
+    else if (guided) throw failure("VAULT_ADMIN_ADAPTER_REQUIRED");
+  }
   if (input && !output) throw failure("VAULT_SECRETS_OUTPUT_REQUIRED");
   if (output && !options.secretOutput) throw failure("SECRETS_OUTPUT_ADAPTER_REQUIRED");
   if (!output && !options.discloseInteractiveSecrets) throw failure("INTERACTIVE_SECRETS_OUTPUT_REQUIRED");
+  if (action === "add" && guided) {
+    await options.showReview?.(["fos vault creation plan", `vault: ${target}`, `mode: ${mode}`, `endpoint: ${handoffEndpoint}`,
+      `retention: ${keep ? "protected local credential (--keep)" : "one-time"}`, `handoff destination: ${output ?? "terminal (shown once)"}`].join("\n"));
+    if (!await guided.confirm("Create this vault?")) return;
+  }
+  const encryptionPhrase = await handoffPhrase(options.promptEncryptionPhrase, !!input || !!options.unattended || !!options.json);
+  if (action === "add" && adminAdapter) {
+    // Recheck authorization after operator review, before creating a missing bucket.
+    if (await inspectVaultUser(adapter, administrator, target)) return;
+    await createVault(adminAdapter, administrator, target);
+  }
   const retained = action === "rotate" && options.credentialStore?.readVault
     ? await options.credentialStore.readVault(target) : undefined;
   const result = action === "add"
@@ -597,7 +654,7 @@ export async function runVaultCommand(args: string[], options: RunVaultCommandOp
   else if (action === "rotate" && retained) await removeVault(options.credentialStore, target);
   const handoff = vaultHandoffContents(result.credential.username, result.credential.password, rendered);
   if (output) await options.secretOutput!.writeFileAtomically(output, handoff, writeOptions);
-  else await options.discloseInteractiveSecrets!(handoff);
+  else if (!options.json) await options.discloseInteractiveSecrets!(handoff);
 }
 
 /** Runs a read-only preview unless explicit approval is supplied. Data deletion needs a separate exact confirmation. */

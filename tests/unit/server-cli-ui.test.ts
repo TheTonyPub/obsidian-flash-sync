@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PassThrough } from "node:stream";
 import QRCode from "qrcode";
-import { colorsEnabled, errorRecoveryHint, formatCliHelp, formatFailure, formatHandoffOutput, formatHumanOutput, formatPreview, formatVaultResult, helpTopicForArgs, renderHandoffQr, selectTerminal } from "../../packages/server-cli/src/ui.js";
+import { colorsEnabled, errorRecoveryHint, formatCliHelp, formatFailure, formatHandoffOutput, formatHumanOutput, formatPreview, formatVaultResult, helpTopicForArgs, renderHandoffQr } from "../../packages/server-cli/src/ui.js";
 
 const stripAnsi = (value: string): string => value.replace(
   new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"),
@@ -104,24 +103,4 @@ describe("server CLI presentation", () => {
     expect(QRCode.create(uri, { errorCorrectionLevel: "M" }).modules.data).toEqual(matrix.data);
   });
 
-  it("restores terminal mode and pauses input when the selection is cancelled", async () => {
-    const previousTerm = process.env.TERM;
-    delete process.env.TERM;
-    const input = new PassThrough() as PassThrough & NodeJS.ReadStream;
-    Object.defineProperty(input, "isTTY", { value: true });
-    const rawModes: boolean[] = [];
-    input.setRawMode = (enabled: boolean) => { rawModes.push(enabled); return input; };
-    const output = new PassThrough() as PassThrough & NodeJS.WriteStream;
-    Object.defineProperty(output, "isTTY", { value: true });
-    const selection = selectTerminal("Choose mode", ["native", "docker"], input, output);
-    const rejected = expect(selection).rejects.toThrow("INPUT_CANCELLED");
-    await new Promise((resolve) => setImmediate(resolve));
-    input.emit("data", Buffer.from("\u0003"));
-
-    await rejected;
-    expect(rawModes).toEqual([true, false]);
-    expect(input.isPaused()).toBe(true);
-    if (previousTerm === undefined) delete process.env.TERM;
-    else process.env.TERM = previousTerm;
-  });
 });

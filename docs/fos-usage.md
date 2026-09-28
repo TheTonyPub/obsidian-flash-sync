@@ -13,9 +13,9 @@ sudo fos plan
 sudo fos bootstrap --wss-endpoint wss://sync.example.com --keep
 ```
 
-The interactive flow asks for native, Docker Compose, or Podman Compose mode, the domain, the first vault ID, and optional operations such as firewall and backup management. It displays a redacted plan and asks before making host changes. First bootstrap creates a random NATS administrator credential and a separate first-vault credential. Save both from the protected handoff; the administrator credential is required for future bucket and user management, while only the vault credential belongs in Obsidian.
+The interactive flow asks for native, Docker Compose, or Podman Compose mode, the domain, an optional ACME email, the first vault ID, and firewall/service-account choices. Installation choices include descriptions. Invalid entered values can be corrected at the same field; valid explicit flags supply their values without redundant questions. Backup scheduling uses `--backup-destination` and `--backup-retention`. The CLI displays a redacted plan and asks before making host changes. First bootstrap creates a random NATS administrator credential and a separate first-vault credential. Save both from the protected handoff; the administrator credential is required for future bucket and user management, while only the vault credential belongs in Obsidian.
 
-In a terminal, use the up/down arrow keys and Enter to choose an installation mode; keys `1` through `3` also select a mode. Answer yes/no prompts with `y` or `n`. Press Ctrl+C to cancel; the CLI restores terminal input before it exits. Plan paths appear in a separate highlighted section. Set `NO_COLOR=1` or `TERM=dumb` to disable color. The optional QR encryption phrase is entered without echo.
+In a terminal, use up/down arrows and Enter to select options. Mutation confirmation defaults to **Cancel**; choose **Apply** to proceed. Interactive bootstrap still confirms when `--approve` is supplied. Ctrl+C during a prompt restores input and cursor state and exits with status 130. Cancellation before approval makes no changes; interruption after apply starts does not promise rollback. Plan paths appear in a separate highlighted section. `NO_COLOR=1` disables color while keeping keyboard selection. `TERM=dumb` uses plain numbered prompts without terminal animation. Administrator passwords and optional QR encryption phrases are entered without echo.
 
 If firewall management is selected, `fos` adds allow rules for the detected SSH port and ports 80 and 443. It does not enable UFW. An inactive UFW remains inactive and does not start filtering traffic.
 
@@ -31,7 +31,31 @@ fos vault list --help
 fos vault verify --help
 ```
 
-The interactive CLI uses color only when stdout is a terminal and `NO_COLOR` is unset and `TERM` is not `dumb`. Help and human-readable output are plain text when redirected. Structured vault results use JSON when redirected; use `--json` to request JSON explicitly in a terminal.
+Interactive collection requires both stdin and stdout to be terminals. Color also requires `NO_COLOR` to be unset and `TERM` not to be `dumb`. Redirected output and supported `--json` requests disable prompts and animation; missing required values fail rather than waiting for input. Structured vault results use JSON when redirected; use `--json` to request JSON explicitly in a terminal. Add/rotate with JSON require `--secrets-output` so the handoff cannot contaminate JSON output.
+
+## Browse and add vaults
+
+```sh
+sudo fos vault
+sudo fos vault list --interactive
+sudo fos vault add --keep
+```
+
+`fos vault` opens a browser with vault metadata, **Add new vault**, and **Exit**. Select a vault to **Inspect**, **Import to Obsidian**, go **Back**, or **Exit**. The browser refreshes after actions. Import uses only an existing retained credential; it does not rotate a password or enable retention. A vault created without `--keep` has no retained plaintext for later import. Rotation, revocation, and access verification remain explicit subcommands.
+
+The browser accepts `--mode`, `--admin-input`, `--secrets-output`, `--wss-endpoint`, and `--keep`. Endpoint and output overrides apply to add/import; `--keep` applies only to add. `fos vault list --interactive` accepts the usual list mode/admin options and uses terminal handoff with no retention for creation. `--interactive` requires both terminals and cannot combine with `--json`. Bare `fos vault` outside a terminal displays help without contacting services; `fos vault --help` always displays help.
+
+`fos vault add` prompts for a missing ID, preflights administrator access and existing state, and displays the ID, endpoint, retention choice, and handoff destination before confirmation. Confirmed creation ensures a bucket exists, creates the scoped user, verifies access, and delivers the protected handoff. Existing content is preserved. Unattended add keeps explicit inputs and does not acquire a new confirmation requirement:
+
+```sh
+sudo fos vault add --vault-id research --mode podman \
+  --admin-input /root/fos-admin-input \
+  --wss-endpoint wss://sync.example.com \
+  --secrets-output /root/research-handoff --keep
+sudo fos vault list --json --admin-input /root/fos-admin-input
+```
+
+Keep handoff files protected. Explicit `--secrets-output` suppresses terminal credential disclosure in both guided creation and browser import.
 
 ## Command reference
 
@@ -43,7 +67,7 @@ The interactive CLI uses color only when stdout is a terminal and `NO_COLOR` is 
 | `fos vault list` | List all vault buckets. No `--vault-id` is needed. Uses the managed installation mode when available; otherwise pass `--mode`. |
 | `fos vault create --vault-id ID` | Create a bucket if missing. |
 | `fos vault inspect --vault-id ID` | Show one bucket if present. |
-| `fos vault add --vault-id ID` | Create a vault user and issue a protected handoff. |
+| `fos vault add [--vault-id ID]` | Ensure a bucket, create its user, and issue a verified handoff; a terminal can collect the ID. |
 | `fos vault rotate --vault-id ID` | Replace a vault credential and issue a new handoff. |
 | `fos vault revoke --vault-id ID` | Revoke a vault user's access. |
 | `fos vault verify --vault-id ID --vault-input FILE` | Verify that the supplied vault credential has access only to its own bucket. `--cross-vault-id ID` additionally checks a named peer. |
@@ -53,7 +77,7 @@ The interactive CLI uses color only when stdout is a terminal and `NO_COLOR` is 
 | `fos upgrade` | Preview an upgrade. `--approve` applies it. |
 | `fos uninstall` | Preview removal. `--approve` applies it; data deletion additionally needs `--delete-data --confirm DELETE_DATA`. |
 
-Vault commands accept `--mode native|docker|podman` to override mode detection. Otherwise they use the managed installation mode. Administrator credentials are read from the protected local credential store when available; `--admin-input FILE` overrides that source, and an interactive prompt is the fallback. If no managed installation mode is available, the command reports `INSTALL_MODE_REQUIRED`. Commands that target an individual vault still require its ID and any action-specific credential inputs.
+Vault commands accept `--mode native|docker|podman` to override mode detection. Otherwise they use the managed installation mode. Administrator credentials are read from the protected local credential store when available; `--admin-input FILE` overrides that source, and an interactive prompt is the fallback. If no managed installation mode is available, the command reports `INSTALL_MODE_REQUIRED`. Commands that target an individual vault require its ID and action-specific inputs; interactive `vault add` can collect a missing ID.
 
 Use `--help` on any command for its complete options, required inputs, and examples. Options such as `--admin-input`, `--vault-input`, `--input`, and `--secrets-output` refer to protected files and must not contain credentials in shell arguments.
 

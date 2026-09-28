@@ -83,7 +83,7 @@ describe("fos bootstrap credential integration", () => {
   it("uses explicit protected output in interactive bootstrap instead of terminal disclosure", async () => {
     const secretOutput = { writeFileAtomically: vi.fn().mockResolvedValue(undefined) };
     const discloseInteractiveSecrets = vi.fn();
-    const prompt = vi.fn().mockResolvedValue("yes");
+    const prompt = vi.fn().mockImplementation(async (question: string) => question.includes("ACME email") ? "ops@example.test" : "yes");
     const args = ["bootstrap", "--mode", "docker", "--domain", "sync.example.test", "--vault-id", "notes", "--secrets-output", "/root/fos-secrets"];
 
     await runBootstrap(args, {
@@ -102,7 +102,7 @@ describe("fos bootstrap credential integration", () => {
     state.writeStateAtomically.mockRejectedValue(new Error("state unavailable"));
     const secretOutput = { writeFileAtomically: vi.fn().mockResolvedValue(undefined) };
     const discloseInteractiveSecrets = vi.fn();
-    const prompt = vi.fn().mockResolvedValue("yes");
+    const prompt = vi.fn().mockImplementation(async (question: string) => question.includes("ACME email") ? "ops@example.test" : "yes");
     const args = ["bootstrap", "--mode", "docker", "--domain", "sync.example.test", "--vault-id", "notes", "--secrets-output", "/root/fos-secrets"];
 
     await expect(runBootstrap(args, {

@@ -83,9 +83,16 @@ async function updateUsers(adapter: VaultUserAdapter, before: ManagedAuthorizati
 }
 
 function existingFor(users: readonly ManagedVaultUser[], vaultId: string): ManagedVaultUser | undefined {
-  const user = users.find((item) => item.vaultId === vaultId);
-  if (user && user.username !== `fos-vault-${vaultId}`) throw new Error("VAULT_USER_COLLISION");
+  const user = users.find((item) => item.vaultId === vaultId || item.username === `fos-vault-${vaultId}`);
+  if (user && (user.vaultId !== vaultId || user.username !== `fos-vault-${vaultId}`)) throw new Error("VAULT_USER_COLLISION");
   return user;
+}
+
+/** Read-only preflight shared by guided creation and mutation-time checks. */
+export async function inspectVaultUser(adapter: VaultUserAdapter, administrator: AdministratorCredentials, vaultId: string): Promise<ManagedVaultUser | undefined> {
+  await requireAdministrator(adapter, administrator);
+  requireVaultId(vaultId);
+  return existingFor((await adapter.readAuthorization()).users, vaultId);
 }
 
 export async function addVaultUser(adapter: VaultUserAdapter, administrator: AdministratorCredentials, vaultId: string,

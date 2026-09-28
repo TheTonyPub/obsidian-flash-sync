@@ -51,6 +51,22 @@ describe("published fos bundle", () => {
       expect(incompletePlan.stdout).toContain("PLAN_INPUT_REQUIRED");
       expect(incompletePlan.stdout).not.toContain("Installation mode");
 
+      const rejectedCases: Array<[string[], string]> = [
+        [["vault", "list", "--interactive"], "INTERACTIVE_TERMINAL_REQUIRED"],
+        [["vault", "list", "--interactive", "--json"], "INCOMPATIBLE_OUTPUT_OPTIONS"],
+        [["vault", "--json"], "UNKNOWN_BROWSER_OPTION"],
+        [["vault", "inspect", "--interactive"], "UNKNOWN_VAULT_OPTION"],
+        [["vault", "add", "--mode", "docker", "--vault-id", "notes", "--json"], "VAULT_SECRETS_OUTPUT_REQUIRED"],
+      ];
+      for (const [args, code] of rejectedCases) {
+        const result = spawnSync(process.execPath, [join(isolated, "main.js"), ...args], { encoding: "utf8", timeout: 2000 });
+        expect(result.status, result.stderr).toBe(1);
+        expect(result.stdout).toContain(code);
+        expect(result.stdout).not.toContain("\u001b");
+        expect(result.stdout).not.toContain("Choose");
+        expect(result.stdout).not.toContain("Vault password:");
+      }
+
       const worker = spawnSync(process.execPath, [join(isolated, "admin-worker.js")], { input: "{", encoding: "utf8" });
       expect(worker.stderr).toContain("SyntaxError");
       expect(worker.stderr).not.toContain("Cannot find module");
