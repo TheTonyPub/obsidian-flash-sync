@@ -95,6 +95,23 @@ describe("verified artifact publication", () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
+  it.each([
+    ["/actions/artifacts/456/zip", "application/vnd.github+json"],
+    ["/releases/assets/100", "application/octet-stream"],
+  ])("downloads %s with its required media type and no token on redirects", async (path, accept) => {
+    const fetch = vi.fn().mockImplementationOnce((_url, options: RequestInit) => {
+      const accepted = (options.headers as Record<string, string>).Accept === accept;
+      return Promise.resolve(new Response(null, { status: accepted ? 302 : 415, headers: { location: "https://storage.example.invalid/file" } }));
+    }).mockResolvedValueOnce(new Response("downloaded bytes"));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const api = publication.createGitHubApi("fixture-token");
+      await expect(api.bytes(`/repos/owner/repo${path}`)).resolves.toEqual(Buffer.from("downloaded bytes"));
+      expect(fetch.mock.calls[0][1].headers).toMatchObject({ Accept: accept, Authorization: "Bearer fixture-token" });
+      expect(fetch.mock.calls[1][1].headers).toBeUndefined();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("publishes exact candidate files, then repeats without mutations", async () => {
     const fixture = apiFixture();
     await publish(fixture);

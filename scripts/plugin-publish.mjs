@@ -199,7 +199,8 @@ export function createGitHubApi(token) {
   return {
     async json(method, path, body) { return (await request(method, path, body)).json(); },
     async bytes(path) {
-      let response = await request("GET", path, undefined, "application/octet-stream");
+      const accept = /\/releases\/assets\/[1-9]\d*$/.test(path) ? "application/octet-stream" : "application/vnd.github+json";
+      let response = await request("GET", path, undefined, accept);
       if (response.status === 302) {
         const url = new URL(response.headers.get("location"));
         requireMatch(url.protocol === "https:", "Unsafe artifact download redirect");
