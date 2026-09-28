@@ -3,11 +3,14 @@
 [![Master unit test coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2FTheTonyPub%2F26e423a64b46c4ca558901a40f9c9e3d%2Fraw%2Fobsidian-flash-sync-master-lcov-coverage.json)](https://gist.github.com/TheTonyPub/26e423a64b46c4ca558901a40f9c9e3d)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/TheTonyPub/obsidian-flash-sync/ci.yml?branch=master&label=master)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/TheTonyPub/obsidian-flash-sync/ci.yml?branch=dev&label=dev)
-![GitHub Release](https://img.shields.io/github/v/release/TheTonyPub/obsidian-flash-sync?include_prereleases)
+![Stable GitHub Release](https://img.shields.io/github/v/release/TheTonyPub/obsidian-flash-sync)
+![Latest release including prereleases](https://img.shields.io/github/v/release/TheTonyPub/obsidian-flash-sync?include_prereleases)
 ![GitHub License](https://img.shields.io/github/license/TheTonyPub/obsidian-flash-sync)
 ![GitHub Repo stars](https://img.shields.io/github/stars/TheTonyPub/obsidian-flash-sync)
 
-`flash-osidian-sync` is a self-hosted Obsidian plugin that synchronizes vault content through a pre-provisioned NATS JetStream KV bucket over WSS. It is not yet distributed through the Obsidian community plugin catalogue
+`flash-sync` is a self-hosted Obsidian plugin that synchronizes vault content through a pre-provisioned NATS JetStream KV bucket over WSS. It is not yet distributed through the Obsidian community plugin catalogue.
+
+For repository setup, branch rules, PR checks, and the full release cycle, read [CONTRIBUTION.md](CONTRIBUTION.md). Agent development instructions are in [AGENTS.md](AGENTS.md).
 
 ## Contents
 
@@ -29,8 +32,8 @@
 
 ## Manual installation from a release
 
-1. Open the [GitHub releases](https://github.com/TheTonyPub/obsidian-flash-sync/releases) and choose a stable release or alpha/beta prerelease. Development builds are available as CI artifacts from the corresponding GitHub Actions run.
-2. Download `main.js` and `manifest.json` from the selected release or CI artifact. Both files must come from the same build. If that build includes `styles.css`, download it too.
+1. Open the [GitHub releases](https://github.com/TheTonyPub/obsidian-flash-sync/releases) and choose a stable release or explicitly published alpha/beta/rc prerelease. Development and unpublished candidate builds are available as CI artifacts from their exact tagged GitHub Actions run; pushing a candidate tag does not publish a Release.
+2. Download `main.js` and `manifest.json` from the selected release. For a CI artifact, extract the files inside `install/`; `build-info.json` is build evidence, not an installation file. Both installation files must come from the same build. If that build includes `styles.css`, download it too. Older artifacts may contain installation files directly at their root.
 3. Create the plugin folder in the target vault. Replace `/path/to/vault` with the local filesystem path of the vault:
 
 ```bash

@@ -1,5 +1,4 @@
 .codegraph
-AGENTS.md
 graphify-out/
 node_modules/
 dist/
