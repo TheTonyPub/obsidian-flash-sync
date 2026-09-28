@@ -54,7 +54,7 @@ Keep implementation with the primary Sol/medium owner when it can complete the w
 
 The owner authorized live testing without a stable release after local acceptance.
 
-- [ ] 7.1 Integrate the verified CI change into default `dev` through a pull request after successful GitHub checks; record the PR and resulting commit.
-- [ ] 7.2 Create a non-conflicting candidate tag, verify its full CI and exact installation artifact, and establish the matching release branch at the same commit.
-- [ ] 7.3 Dispatch candidate publication with exact run/attempt/artifact inputs; verify prerelease status, complete assets and unchanged latest stable release, then repeat the same request to prove no mutation.
-- [ ] 7.4 Download published installation assets, compare all hashes against the selected CI artifact, and record live run/release evidence and remaining unverified stable/immutability behavior.
+- [x] 7.1 Integrate the verified CI change into default `dev` through a pull request after successful GitHub checks; record the PR and resulting commit.
+- [x] 7.2 Create a non-conflicting candidate tag, verify its full CI and exact installation artifact, and establish the matching release branch at the same commit.
+- [x] 7.3 Dispatch candidate publication with exact run/attempt/artifact inputs; verify prerelease status, complete assets and unchanged latest stable release, then repeat the same request to prove no mutation.
+- [x] 7.4 Download published installation assets, compare all hashes against the selected CI artifact, and record live run/release evidence and remaining unverified stable/immutability behavior.
