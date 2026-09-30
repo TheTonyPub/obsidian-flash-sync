@@ -2,7 +2,9 @@
 
 Use a **new empty local vault** on the iPhone. Do not copy the Mac vault's `.obsidian` directory or the plugin's `data.json`: it contains a device ID and device-specific SecretStorage references. The notes will arrive through NATS after connection.
 
-## Install from a release or CI artifact
+## Install
+
+The simplest route is BRAT, which installs beta plugins directly on iOS; follow the [beta tester guide](beta-tester-guide.md#1-install-the-plugin-with-brat). To install by hand from a release or CI artifact instead:
 
 1. Create an empty vault in Obsidian on the iPhone, stored **On My iPhone**.
 2. Download matching `main.js` and `manifest.json` from one stable release or alpha/beta prerelease. For development builds, use the matching files from its GitHub Actions artifact. Include `styles.css` only if that build provides it. Do not use GitHub's Source code zip or tar.gz as install packages.

@@ -10,10 +10,13 @@
 
 `flash-sync` is a self-hosted Obsidian plugin that synchronizes vault content through a pre-provisioned NATS JetStream KV bucket over WSS. It is not yet distributed through the Obsidian community plugin catalogue.
 
+Beta testers: follow the [beta tester guide](docs/beta-tester-guide.md) for BRAT installation, `fos` server setup and settings import.
+
 For repository setup, branch rules, PR checks, and the full release cycle, read [CONTRIBUTION.md](CONTRIBUTION.md). Agent development instructions are in [AGENTS.md](AGENTS.md).
 
 ## Contents
 
+- [Beta tester guide](docs/beta-tester-guide.md)
 - [Prerequisites](#prerequisites)
 - [Manual installation from a release](#manual-installation-from-a-release)
 - [Build from source (optional)](#build-from-source-optional)
