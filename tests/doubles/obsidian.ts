@@ -28,3 +28,5 @@ export class Setting {}
 export class SecretComponent {}
 export class MarkdownView {}
 export class TFile {}
+export class ToggleComponent {}
+export const Platform = { isMobile: false, isPhone: false, isDesktop: true };

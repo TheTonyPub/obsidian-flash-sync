@@ -91,7 +91,7 @@ describe("plugin configuration import", () => {
     expect(connectVault).not.toHaveBeenCalled();
   });
 
-  it("saves only active section fields and never serializes replacement secrets", async () => {
+  it("ignores attachment fields while storage is off and never serializes replacement secrets", async () => {
     const { app, secretStorage } = createApp();
     const plugin = new EasySyncPlugin(app as never, {} as never);
     configure(plugin);
@@ -99,7 +99,7 @@ describe("plugin configuration import", () => {
       natsPassword: "replacement-password", s3Endpoint: "https://stale-draft.example.com",
       s3Bucket: "stale-draft", s3AccessKeyId: "stale-access", s3Secret: "stale-secret" };
 
-    const outcome = await plugin.applyDraft(draft as never, "connection");
+    const outcome = await plugin.applyDraft(draft as never, "server");
 
     expect(outcome.kind).toBe("connection-error");
     const saved = JSON.stringify(pluginInstances.at(-1)?.savedData);
@@ -111,6 +111,56 @@ describe("plugin configuration import", () => {
     expect(secretStorage.setSecret).toHaveBeenCalledWith(expect.stringMatching(/^flash-sync-nats-/), "replacement-password");
   });
 
+  it("saves connection and attachment storage together while storage is on", async () => {
+    const { app, secretStorage } = createApp();
+    const plugin = new EasySyncPlugin(app as never, {} as never);
+    configure(plugin);
+    const draft = { ...plugin.config, server: "wss://new.example.com", natsPassword: "replacement-password",
+      attachmentsEnabled: true, s3Endpoint: "https://s3.example.com", s3Bucket: "vault", s3Region: "eu-west-1",
+      s3AccessKeyId: "access", s3Secret: "s3-secret" };
+
+    const outcome = await plugin.applyDraft(draft as never, "server");
+
+    expect(outcome.kind).toBe("connection-error");
+    expect(plugin.config).toMatchObject({ server: "wss://new.example.com", s3Endpoint: "https://s3.example.com",
+      s3Bucket: "vault", s3Region: "eu-west-1", s3AccessKeyId: "access", s3SecretKeySecretKey: expect.stringMatching(/^flash-sync-s3-/) });
+    const saved = JSON.stringify(pluginInstances.at(-1)?.savedData);
+    expect(saved).not.toContain("s3-secret");
+    expect(saved).not.toContain("replacement-password");
+    expect(secretStorage.setSecret).toHaveBeenCalledWith(expect.stringMatching(/^flash-sync-s3-/), "s3-secret");
+    expect(connectVault).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns attachment storage off even while its secret is still saved", async () => {
+    const { app, secretStorage } = createApp();
+    secretStorage.setSecret("old-password", "stored-password");
+    secretStorage.setSecret("old-s3", "stored-s3-secret");
+    const plugin = new EasySyncPlugin(app as never, {} as never);
+    configure(plugin);
+    Object.assign(plugin.config, { s3Endpoint: "https://s3.example.com", s3Bucket: "vault", s3Region: "eu-west-1",
+      s3AccessKeyId: "access", s3SecretKeySecretKey: "old-s3" });
+
+    const outcome = await plugin.applyDraft({ ...plugin.config, natsPassword: "", s3Secret: "", attachmentsEnabled: false } as never, "server");
+
+    expect(outcome.kind).not.toBe("validation-error");
+    expect(plugin.config).toMatchObject({ s3Endpoint: "", s3Bucket: "", s3Region: "us-east-1", s3AccessKeyId: "", s3SecretKeySecretKey: "" });
+    expect(plugin.status.attachmentState).toBe("NOT_CONFIGURED");
+  });
+
+  it("rejects an incomplete attachment draft without changing the connection", async () => {
+    const { app } = createApp();
+    const plugin = new EasySyncPlugin(app as never, {} as never);
+    configure(plugin);
+    const before = { ...plugin.config };
+
+    const outcome = await plugin.applyDraft({ ...plugin.config, server: "wss://new.example.com", natsPassword: "replacement-password",
+      attachmentsEnabled: true, s3Endpoint: "https://s3.example.com", s3Bucket: "", s3Secret: "" } as never, "server");
+
+    expect(outcome).toMatchObject({ kind: "validation-error", errors: { s3Bucket: "Bucket is required." } });
+    expect(plugin.config).toEqual(before);
+    expect(connectVault).not.toHaveBeenCalled();
+  });
+
   it("keeps active configuration and runtime when settings persistence fails", async () => {
     const { app, secretStorage } = createApp();
     const plugin = new EasySyncPlugin(app as never, {} as never);
@@ -120,7 +170,7 @@ describe("plugin configuration import", () => {
     const disconnect = vi.spyOn(plugin as unknown as { disconnect: () => Promise<void> }, "disconnect").mockResolvedValue();
 
     const outcome = await plugin.applyDraft({ ...plugin.config, server: "wss://new.example.com",
-      natsPassword: "replacement-password", s3Secret: "" } as never, "connection");
+      natsPassword: "replacement-password", s3Secret: "" } as never, "server");
 
     expect(outcome).toMatchObject({ kind: "persistence-error" });
     expect(JSON.stringify(outcome)).not.toContain("replacement-password");
@@ -172,7 +222,7 @@ describe("plugin configuration import", () => {
     const before = { ...plugin.config };
 
     const outcome = await plugin.applyDraft({ ...plugin.config, server: "https://not-secure.example.com",
-      natsPassword: "replacement-password", s3Secret: "" } as never, "connection");
+      natsPassword: "replacement-password", s3Secret: "" } as never, "server");
 
     expect(outcome).toMatchObject({ kind: "validation-error" });
     expect(plugin.config).toEqual(before);
@@ -204,7 +254,7 @@ describe("plugin configuration import", () => {
     const retry = plugin.connectNow();
     await vi.waitFor(() => expect(connectVault).toHaveBeenCalledTimes(1));
     const draft = { ...plugin.config, server: "wss://submitted.example.com", natsPassword: "", s3Secret: "" };
-    const apply = plugin.applyDraft(draft as never, "connection");
+    const apply = plugin.applyDraft(draft as never, "server");
     draft.server = "wss://mutated-later.example.com";
     rejectFirst(new Error("offline"));
 

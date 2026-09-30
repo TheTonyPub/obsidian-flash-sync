@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createLogger, errorSummary } from "../../packages/plugin/src/diagnostics.js";
+import { buildStatusReport, createLogger, errorSummary } from "../../packages/plugin/src/diagnostics.js";
 import { SyncStatus, type KvPort } from "../../packages/plugin/src/connection.js";
 import { MarkdownSyncEngine } from "../../packages/plugin/src/markdown-sync.js";
 import { LocalStore } from "../../packages/plugin/src/local-store.js";
@@ -95,5 +95,45 @@ describe("plugin diagnostics", () => {
     expect(sink.error).toHaveBeenCalledWith(expect.stringMatching(/^\[flash-sync\] \d{4}-\d{2}-\d{2}T.*Z vault\.read_failed: read failed$/), {});
     engine.stop();
     store.close();
+  });
+
+  it("builds a status report with states and counts but never secrets or URL credentials", () => {
+    const status = new SyncStatus();
+    status.connectionState = "AUTH_ERROR";
+    status.value = "AUTH_ERROR";
+    status.pending = 3;
+    status.blobsPending = 1;
+    status.conflicts = 2;
+    status.attachmentState = "CONFIGURED";
+    status.lastReconciledAt = Date.UTC(2026, 8, 30, 12, 0, 0);
+    status.connectionError = "Authorization Violation at wss://alice:hunter2@sync.example.test:8443/ws?token=hidden";
+    status.lastError = "Rejected stored-password-value while importing obsidian://flash-sync-import?data=2.eyJ2YXVsdElkIjoiQSJ9 " +
+      "code 1.QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eg";
+    const report = buildStatusReport(status, {
+      vaultId: "VAULT_A", server: "wss://alice:hunter2@sync.example.test:8443/ws?token=hidden", debugLogging: false,
+      inlineLimit: 524288, statusBarMode: "extended",
+    }, { pluginVersion: "0.2.1", platform: "desktop", now: new Date(Date.UTC(2026, 8, 30, 12, 5, 0)),
+      redact: (message) => message.replaceAll("stored-password-value", "[redacted]") });
+
+    expect(report).toContain("flash-sync status report");
+    expect(report).toContain("Plugin version: 0.2.1");
+    expect(report).toContain("Sync server: AUTH_ERROR (sync.example.test:8443)");
+    expect(report).toContain("Pending note changes: 3");
+    expect(report).toContain("Pending attachment transfers: 1");
+    expect(report).toContain("Conflicts: 2");
+    expect(report).toContain("Last reconciled: 2026-09-30T12:00:00.000Z");
+    expect(report).toContain("Authorization Violation");
+    for (const secret of ["alice", "hunter2", "hidden", "stored-password-value", "eyJ2YXVsdElkIjoiQSJ9", "QUJDREVGR0hJSktM"]) {
+      expect(report).not.toContain(secret);
+    }
+  });
+
+  it("reports an empty error list and unknown reconciliation time explicitly", () => {
+    const report = buildStatusReport(new SyncStatus(), { vaultId: "VAULT_A", server: "", debugLogging: true,
+      inlineLimit: 524288, statusBarMode: "minimal" }, { pluginVersion: "0.2.1", platform: "mobile" });
+    expect(report).toContain("Sync server: UNCONFIGURED (not set)");
+    expect(report).toContain("Last reconciled: never");
+    expect(report).toContain("Recent errors: none");
+    expect(report).toContain("Platform: mobile");
   });
 });

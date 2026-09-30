@@ -62,23 +62,23 @@ Copy `packages/plugin/dist/main.js` and `packages/plugin/manifest.json` into `.o
 > [!IMPORTANT]
 > Set up the server before configuring the plugin. The server administrator must create the vault's `OBS_<vaultId>_FILES` JetStream KV bucket and issue its vault ID, NATS username, and password. You also need the server's reachable `wss://` URL. Follow the [server bootstrap CLI guide](docs/fos-install.md) to prepare the server and credentials.
 
-Open **Settings → Community plugins → flash-sync** and enter the provisioned values:
+Open **Settings → Community plugins → flash-sync**. Settings have three sections: **Sync** (status, conflicts, other devices), **Server** (connection and attachment storage), and **Advanced**. If another device already syncs this vault, select **Paste transfer code** on **Sync** and paste its code. Otherwise select **Set up manually** and enter the provisioned values on **Server**:
 
 - **Vault ID**: the existing vault ID, such as `my_vault`.
-- **NATS WSS URL**: the server URL, for example `wss://sync.example.com`.
-- **NATS username** and **NATS password**: the credentials assigned to this vault. Obsidian stores the password through its secret storage.
+- **Server address**: the server URL, for example `wss://sync.example.com`.
+- **Username** and **Password**: the credentials assigned to this vault. Obsidian stores the password through its secret storage.
 
 The plugin connects only to the bucket derived from the vault ID: `OBS_<vaultId>_FILES`. Use the exact ID supplied by the server administrator when joining an existing vault. Once the plugin has connected, its vault binding cannot be changed from settings.
 
 ## S3 is optional
 
-S3 is optional. Leave every S3 field empty when object storage is not configured; Markdown and other content that fits the inline limit continue to synchronize through NATS. In this mode, images and other files larger than the inline limit are not synchronized.
+S3 is optional. Leave **Attachment storage** switched off on **Server** when object storage is not configured; Markdown and other content that fits the inline limit continue to synchronize through NATS. In this mode, images and other files larger than the inline limit are not synchronized.
 
-To enable large-file synchronization, configure all S3 fields: an HTTPS endpoint, bucket, region, access key ID, and secret key. The plugin reports incomplete or failed S3 configuration in its status and does not treat it as a successful large-file connection.
+To enable large-file synchronization, switch on **Attachment storage** and configure all S3 fields: an HTTPS endpoint, bucket, region, access key ID, and secret key. The plugin reports incomplete or failed S3 configuration in its status and does not treat it as a successful large-file connection.
 
 ## Check connection
 
-After entering the NATS values, select **Connect**. A successful initial reconciliation changes **Status** to `SYNCED`; ongoing work may briefly show `RECONCILING` or `PENDING`. If it reports `AUTH_ERROR`, verify the vault ID and per-vault credentials. If it reports `OFFLINE`, verify the `wss://` URL, DNS, TLS certificate, and server availability. Enable **Debug logging** to inspect connection and reconciliation events in Obsidian's developer console.
+After entering the server values, select **Save and reconnect**. A successful initial reconciliation shows **Synchronized** in the **Sync** summary; ongoing work may briefly show **Syncing**. If it reports that it can't sign in, verify the vault ID and per-vault credentials, then use **Update password** or paste a new transfer code. If it shows **Disconnected**, verify the `wss://` URL, DNS, TLS certificate, and server availability. Under **Advanced → Diagnostics**, enable **Debug logging** to inspect connection and reconciliation events in Obsidian's developer console, or use **Copy report** for a redacted status report.
 
 For a safe first sync, back up the vault before connecting another device. Conflicting local content is retained as a separate conflict copy for review.
 

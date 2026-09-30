@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import QRCode from "qrcode";
-import { decryptTransfer, encryptTransfer, type TransferConfig } from "../../packages/plugin/src/config-transfer.js";
+import { decryptTransfer, encryptTransfer, generateTransferPhrase, TRANSFER_PHRASE_ALPHABET,
+  type TransferConfig } from "../../packages/plugin/src/config-transfer.js";
 
 const config: TransferConfig = {
   vaultId: "VAULT_A", server: "wss://sync.example.com", username: "alice", natsPassword: "nats-secret",
@@ -80,5 +81,34 @@ describe("versioned configuration transfer", () => {
 
     await expect(encryptTransfer(oversized, "")).rejects.toThrow(/transfer code|payload/i);
     await expect(decryptTransfer(`2.${encoded}`, "")).rejects.toThrow(/Invalid transfer code/);
+  });
+
+  it("generates a 4x4 phrase from a 32-symbol alphabet without ambiguous characters", () => {
+    expect(TRANSFER_PHRASE_ALPHABET).toHaveLength(32);
+    expect(new Set(TRANSFER_PHRASE_ALPHABET).size).toBe(32);
+    expect(TRANSFER_PHRASE_ALPHABET).not.toMatch(/[01IO]/);
+    const phrase = generateTransferPhrase();
+    expect(phrase).toMatch(/^[2-9A-HJ-NP-Z]{4}(?:-[2-9A-HJ-NP-Z]{4}){3}$/);
+    for (const symbol of phrase.replaceAll("-", "")) expect(TRANSFER_PHRASE_ALPHABET).toContain(symbol);
+  });
+
+  it("draws 80 bits from crypto.getRandomValues without modulo bias", () => {
+    const bytes = Array.from({ length: 16 }, (_, index) => index * 16 + 31);
+    const phrase = generateTransferPhrase((target) => { target.set(bytes); return target; });
+    expect(phrase.replaceAll("-", "")).toBe(bytes.map((byte) => TRANSFER_PHRASE_ALPHABET[byte % 32]).join(""));
+    expect(16 * Math.log2(TRANSFER_PHRASE_ALPHABET.length)).toBe(80);
+  });
+
+  it("returns a different phrase on each call", () => {
+    const phrases = new Set(Array.from({ length: 200 }, () => generateTransferPhrase()));
+    expect(phrases.size).toBe(200);
+  });
+
+  it("round trips the existing encrypted payload with a generated phrase", async () => {
+    const phrase = generateTransferPhrase();
+    const payload = await encryptTransfer(config, phrase);
+    expect(payload.startsWith("1.")).toBe(true);
+    expect(payload).not.toContain(phrase);
+    expect(await decryptTransfer(payload, phrase)).toEqual(config);
   });
 });

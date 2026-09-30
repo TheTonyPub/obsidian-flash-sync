@@ -236,7 +236,7 @@ describe("automatic startup connection lifecycle", () => {
     expect(vi.getTimerCount()).toBeGreaterThan(0);
     const outcome = await lifecycle.plugin.applyDraft({
       ...lifecycle.plugin.config, server: "wss://replacement.example.test", natsPassword: "", s3Secret: "",
-    } as never, "connection");
+    } as never, "server");
 
     expect(outcome).toMatchObject({ kind: "applied" });
     expect(connectVault).toHaveBeenCalledTimes(2);

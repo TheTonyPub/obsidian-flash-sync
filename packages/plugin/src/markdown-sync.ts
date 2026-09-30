@@ -682,7 +682,7 @@ export class MarkdownSyncEngine {
       return;
     }
     status.connected = true;
-    status.reconciled = true;
+    status.markReconciled();
     status.refresh();
     this.options.logger?.debug("reconcile.complete", {
       pending: status.pending, conflicts: status.conflicts, remoteApplied, localApplied,
