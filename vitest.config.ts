@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    // Match CI terminals, where color-capable libraries emit ANSI codes unless explicitly disabled.
+    env: { FORCE_COLOR: "1" },
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],
