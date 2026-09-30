@@ -1,59 +1,61 @@
 schema: spec-driven
 
 context: |
-  Product: self-hosted realtime synchronization for personal Obsidian vaults.
-  Each local vault binds to one stable vaultId and one distinct NATS KV bucket;
-  several vaults can use the same NATS server without mixing records.
-  Primary implementation: an Obsidian community plugin written for Desktop and Mobile.
-  Transport and remote state: direct WSS connection to NATS JetStream KV.
-  Authentication: dedicated NATS username/password per vault, checked by NATS
-  on connection; bucket-scoped permissions, no separate authentication API.
-  Normal Markdown is stored inline in KV; binary and oversized content use
-  S3-compatible object storage with SHA-256 verification.
-  Plugin owns stable file identity, local IndexedDB index and outbox, remote
-  reconciliation, feedback-loop suppression, and client-side conflict handling.
-  Infrastructure deployment, configuration, operations, and incident handling
-  remain user-owned and are outside plugin change scope. CI workflows may be added.
-  Repository must include a short user-run NATS setup guide: one JetStream/KV
-  bucket and NATS user per vault, backing-subject names, required permissions,
-  WSS endpoint, and plugin settings.
-  The guide is configuration reference, not deployment automation or troubleshooting.
-  Preserve data over automatic resolution: no silently discarded local content.
-  Mobile suspension is not background synchronization; reconnect and reconcile on resume.
+  Product: flash-sync, self-hosted realtime sync for personal Obsidian vaults.
+  One repository: plugin (packages/plugin, Desktop and Mobile), shared protocol
+  (packages/protocol) and the fos host CLI (packages/server-cli). AGENTS.md holds
+  layout, invariants, commands, branches and release rules; do not restate it.
+  Transport: direct WSS to NATS JetStream KV; no custom sync API or database.
+  One stable vaultId per local vault, one OBS_<vaultId>_FILES bucket, one NATS user
+  per vault checked by NATS with bucket-scoped permissions; vaultId is not a credential.
+  Markdown up to the inline limit (default 512 KiB) stays in KV; binary/oversized
+  content uses optional S3 with content addressing and SHA-256 checks.
+  Plugin owns fileId identity, IndexedDB index and outbox, reconciliation, feedback
+  suppression and conflicts. Preserve data over automatic resolution; never discard
+  local content silently; order by KV revisions and CAS, never client clocks.
+  Secrets live in Obsidian SecretStorage; data.json holds opaque references only.
+  Mobile suspension is not background sync; reconnect and reconcile on resume.
+  Hosting, deployment and operations stay user-owned; fos administers only the host
+  it runs on. Code and tests do not authorize actions on real hosts or releases.
+  Settings UI visual direction: docs/design/settings-ui/design-qa.md with reference
+  PNGs and .dc.html sources; the plugin follows Obsidian theme variables.
+  Read only affected specs: openspec/specs/<capability>/spec.md. The architecture
+  baseline (openspec/specs/obsidian-realtime-sync-architecture.md) is large; load
+  only sections the change touches. Approved decisions stay binding; compare
+  alternatives for open choices and do not add scope without owner approval.
+  Plan approval, local checks, owner acceptance and release are distinct states.
 
 rules:
   proposal:
-    - Scope each change to the plugin unless the user explicitly requests infrastructure work.
-    - State deployment and runtime operations as user-owned non-goals.
-    - Identify affected acceptance criteria and invariants from the architecture baseline.
-    - Prefer thin vertical slices with explicit exit conditions.
-    - Include required user-run NATS setup documentation when plugin connectivity changes.
+    - Write in English; preserve schema markers and existing spec identities.
+    - Scope to the plugin or CLI named by the owner; hosting and runtime operations are non-goals.
+    - Max 2000 characters. Why in at most 3 sentences; What Changes as bullets (mark BREAKING); one Non-goals line; Impact lists concrete files and affected specs.
+    - A whole change (proposal, design, specs, tasks) stays under 20000 characters. Tighten wording first; split only with owner approval.
   design:
-    - Keep NATS JetStream KV as the remote state store; do not introduce a custom sync backend or database without an approved design change.
-    - Keep normal Markdown off the S3 path; use configurable 512 KiB initial inline limit.
-    - Preserve stable fileId across rename and never use client clocks to choose a winner.
-    - Store credentials only in Obsidian SecretStorage, never plugin data.json.
-    - Use direct NATS authentication and per-vault bucket permissions; never treat vaultId as an access credential.
+    - Describe contracts, reuse, dependencies and implementation order without duplicating specs.
+    - Keep NATS KV, SecretStorage, inline-limit, fileId and CAS invariants; justify any new module.
+    - For changed visual direction, update docs/design/settings-ui/design-qa.md, reference PNGs and sources together; mark captures pending until refreshed.
+    - Max 4000 characters. Context links current code and evidence; numbered Decisions, each with a rejected alternative; Risks as "[risk] → mitigation"; Migration in a few lines.
   specs:
-    - Express data-preservation, idempotency, durable-outbox, and no-feedback-loop behavior as testable scenarios.
-    - Separate online, offline, reconnect, conflict, rename/delete, and blob behaviors.
+    - Specify observable behavior as testable scenarios; keep online, offline, reconnect, conflict, rename/delete and blob behavior separate.
+    - Express data preservation, idempotency, durable outbox and no-feedback-loop rules explicitly when touched.
+    - Max 4500 characters per capability file. MODIFIED requirements copy the full requirement; prefer ADDED or a new capability over rewriting long ones.
+    - For pure refactors or tooling, set skip_specs true in .openspec.yaml instead of inventing requirements.
   tasks:
-    - "Order work by TDD: requirement-derived failing tests, minimal implementation, then verification."
-    - Keep tasks plugin-focused; GitHub Actions are allowed, deployment automation is not.
-    - "Use gpt-6-sol with medium reasoning as the default owner for architecture, implementation, tests, documentation, verification, and final review."
-    - "When delegation has a clear benefit, use gpt-6-luna with medium reasoning for bounded exploration, test design, routine verification, and documentation; use gpt-6-luna with high reasoning for bounded implementation including tests and related documentation."
-    - "Keep one implementation owner per coherent feature and reuse that owner across tests, code, and documentation. Do not create agents per checkbox or TDD phase. Model choices belong in Codex configuration and agent profiles; task metadata does not switch the active model."
-    - "Keep implementation with the primary Sol/medium owner when it can complete the work. Delegate only for a concrete benefit, such as independent work that reduces total cost or elapsed time; a cheaper available model or task label alone is not a reason to delegate."
-    - Add short NATS KV configuration documentation before an MVP release candidate.
+    - Write English tasks with stable checkbox IDs, outcomes, dependencies and a verifiable "Done when".
+    - Max 6500 characters, 600 per task. Start with "Execution notes" (files to read, base branch dev, local-only scope, TDD, no secrets) so the change runs without chat context.
+    - One owner carries tests, implementation and docs; model hints never require separate agents. Delegate only for a concrete cost or time benefit.
+    - Record RED before behavior code and GREEN afterward; no separate failing-test commit. Validate docs/config edits proportionately.
+    - Name exact paths per task. Owner, disposable-vault or device checks go in a separate deferrable group. The last task runs openspec validate --strict.
+    - Link evidence instead of repeating results in each task.
 
 operations:
   apply:
     guidance:
-      - Use CodeGraph before code search or codebase explanation; use text search only when needed.
-      - Use Caveman mode for concise command output and status reporting.
-      - Do not deploy, configure, or troubleshoot user-hosted services unless explicitly authorized.
-      - Run focused unit tests before integration or simulation tests; report executed evidence only.
+      - Apply only a change whose proposal.md starts with a "> Approved:" line; otherwise stop and ask the owner.
+      - Load context once per session; reread changed files before dependent work. Do not restart apply per checkbox.
+      - Use CodeGraph once per unfamiliar area; reuse findings. Run focused unit tests first, then broader checks at integration.
+      - Report executed evidence only. Do not deploy, tag, publish or touch user-hosted services.
   archive:
     guidance:
-      - Require passing requirement-derived tests and explicit evidence for claimed acceptance criteria.
-      - Do not treat an unexecuted deployment scenario as accepted.
+      - Sync and archive after owner acceptance; require passing requirement-derived tests and evidence links. Unexecuted device or deployment checks stay pending, not accepted.

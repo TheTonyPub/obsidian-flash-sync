@@ -1,5 +1,7 @@
 # Repository instructions
 
+Keep this file and `CLAUDE.md` in sync: same rules, with `CLAUDE.md` phrased for Claude Code.
+
 ## Product and layout
 
 - Repository: `obsidian-flash-sync`; public Obsidian plugin identity: `flash-sync`.
@@ -14,7 +16,7 @@
 - `tests/unit`, `tests/integration`, `tests/simulation`: progressively broader verification.
 - `scripts`: build, packaging, and verified publication tooling.
 - `.github/workflows`: checks, tag artifacts, and explicit plugin publication.
-- `openspec/specs` and active change deltas: requirements; `docs`: operator references.
+- `openspec/specs` and active change deltas: requirements; `docs`: operator references; `docs/design`: visual references.
 - Preserve existing internal package names and deployed-state paths; public branding does not authorize migration.
 
 ## Architecture and invariants
@@ -36,6 +38,20 @@
 - S3 is optional. Without it, inline content still syncs; blob-dependent files stay local and unsynced.
 - Configured blobs use content addressing and integrity checks; do not put ordinary Markdown on the S3 path.
 - Read current specs and active deltas for behavior details; historical targets are not measured guarantees.
+
+## OpenSpec workflow
+
+- `openspec/specs/<capability>/spec.md` is the accepted baseline; active work lives in `openspec/changes/<id>/`; finished changes move to `openspec/changes/archive/`.
+- `openspec/config.yaml` sets context and size limits for proposals, designs, specs and tasks.
+- Implement a change only when its `proposal.md` starts with `> Approved:`; otherwise ask the owner.
+- Read only the active change and the requirements it touches. The architecture baseline `openspec/specs/obsidian-realtime-sync-architecture.md` is large; load only the relevant sections.
+- Plan approval, local checks, owner acceptance, and release are separate states.
+- Validate with `openspec validate <change-id> --strict`; the whole store with `openspec validate --all --strict --no-interactive`.
+
+## Design references
+
+- Settings UI: `docs/design/settings-ui/design-qa.md`, `reference/*.png`, and `source/*.dc.html`. Match structure and copy; take colors from Obsidian theme variables.
+- A change that alters visual direction updates the PNGs, sources, and `design-qa.md` together, or marks captures pending.
 
 ## Discovery and implementation
 
@@ -78,7 +94,7 @@ npm run test:simulation
 
 ## Branches and releases
 
-- Branch feature work from `dev` into `codex/<topic>`; target ordinary feature/fix PRs into `dev`.
+- Base feature work on `dev`; target ordinary feature/fix PRs into `dev`.
 - Candidate fixes branch from and return to temporary `release/x.y.z` stabilization branches.
 - `master` receives accepted stable source. Integrate release fixes into `dev` before retiring release branches.
 - `x.y.z-dev.N` creates internal artifacts only; it cannot create a GitHub Release.

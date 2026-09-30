@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flash-sync · Sync with conflicts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#222222;background:#ffffff}
+button{font-family:inherit;cursor:pointer}
+a{color:#5b36d6}a:hover{color:#4323b0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #ffffff; font-size: 14px; color: #222222; overflow: hidden">
+  <div style="height: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid #e3e3e3; background: #f6f6f6">
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f57"></span>
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #febc2e"></span>
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #28c840"></span>
+    <span style="flex-grow: 1; text-align: center; font-size: 13px; font-weight: 600; color: #5c5c5c; margin-right: 52px">Settings — test — Obsidian</span>
+  </div>
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+    <nav style="width: 250px; flex-shrink: 0; box-sizing: border-box; padding: 14px 12px; background: #f6f6f6; border-right: 1px solid #e3e3e3; display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: #3a3a3a">
+      <div style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; margin-bottom: 10px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; color: #6e6e6e; font-size: 13px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <span>Search settings…</span>
+      </div>
+      <div style="padding: 6px 10px">General</div>
+      <div style="padding: 6px 10px">Editor</div>
+      <div style="padding: 6px 10px">Files and links</div>
+      <div style="padding: 6px 10px">Appearance</div>
+      <div style="padding: 6px 10px">Hotkeys</div>
+      <div style="padding: 6px 10px">Keychain</div>
+      <div style="padding: 6px 10px">Core plugins</div>
+      <div style="padding: 6px 10px">Community plugins</div>
+      <div style="padding: 18px 10px 6px; font-size: 12px; font-weight: 600; color: #6e6e6e">Community plugins</div>
+      <div style="padding: 6px 10px">BRAT</div>
+      <div style="padding: 6px 10px">Copilot</div>
+      <div style="padding: 6px 10px; border-radius: 6px; background: #e4e4e4; font-weight: 600; color: #222222">flash-sync</div>
+    </nav>
+    <main style="flex-grow: 1; box-sizing: border-box; padding: 26px 44px 32px; display: flex; flex-direction: column; gap: 22px; overflow: hidden">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <h1 style="margin: 0; font-size: 20px; font-weight: 700">flash-sync</h1>
+            <div style="font-size: 13px; color: #5c5c5c">Syncs this vault through your own server</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid #e3e3e3; border-radius: 999px; background: #f8f8f8; font-size: 12px; color: #5c5c5c">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span>Vault</span>
+            <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #222222">VAULT_A</span>
+          </div>
+        </div>
+        <div role="tablist" aria-label="flash-sync settings" style="display: flex; gap: 4px; border-bottom: 1px solid #e3e3e3">
+          <button type="button" role="tab" aria-selected="true" style="display: flex; align-items: center; gap: 6px; padding: 9px 14px; border: 0; border-bottom: 2px solid #7852ee; margin-bottom: -1px; background: transparent; font-size: 14px; font-weight: 600; color: #222222">Sync <span style="min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #fff1d6; color: #7a4a00; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center">2</span></button>
+          <button type="button" role="tab" aria-selected="false" style="padding: 9px 14px; border: 0; background: transparent; font-size: 14px; color: #5c5c5c">Server</button>
+          <button type="button" role="tab" aria-selected="false" style="padding: 9px 14px; border: 0; background: transparent; font-size: 14px; color: #5c5c5c">Advanced</button>
+        </div>
+      </div>
+
+      <section style="border: 1px solid #f0d9a8; border-radius: 12px; overflow: hidden">
+        <div role="status" style="display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: #fffaf0">
+          <div style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: #fff1d6; color: #8a5300; display: flex; align-items: center; justify-content: center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M9 10h6"></path><path d="M12 13V7"></path><path d="M9 17h6"></path></svg>
+          </div>
+          <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+            <div style="font-size: 18px; font-weight: 650">2 notes need your decision</div>
+            <div style="font-size: 13px; color: #5c5c5c">Everything else keeps syncing. Both versions of each note are kept until you choose.</div>
+          </div>
+          <button type="button" style="display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            Sync now
+          </button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid #f0d9a8; background: #ffffff">
+          <div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 3px">
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6e6e6e">Sync server</div>
+            <div style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1fb35a"></span>Connected</div>
+            <div style="font-size: 12px; color: #5c5c5c">sync.example.com</div>
+          </div>
+          <div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 3px; border-left: 1px solid #ececec">
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6e6e6e">Attachments</div>
+            <div style="display: flex; align-items: center; gap: 6px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1fb35a"></span>S3 connected</div>
+            <div style="font-size: 12px; color: #5c5c5c">Bucket vault-attachments</div>
+          </div>
+          <div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 3px; border-left: 1px solid #ececec">
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6e6e6e">Waiting to upload</div>
+            <div style="font-weight: 600">1 note</div>
+            <div style="font-size: 12px; color: #5c5c5c">Your choice for Ideas.md</div>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 650">Conflicts · 3</h2>
+          <button type="button" style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; color: #5b36d6">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+            History
+          </button>
+        </div>
+
+        <div style="border: 1px solid #dcdcdc; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06)">
+          <button type="button" aria-expanded="true" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 0; background: transparent; text-align: left; color: #222222">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a5300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+            <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 14px; font-weight: 600">Weekly plan.md</span>
+              <span style="font-size: 12px; color: #5c5c5c">Projects/2026 · edited here and on another device · today 14:32</span>
+            </span>
+            <span style="padding: 3px 8px; border-radius: 999px; background: #fff1d6; color: #7a4a00; font-size: 12px; font-weight: 600">Needs decision</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5c5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"></path></svg>
+          </button>
+          <div style="padding: 0 16px 16px 46px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+              <div style="padding: 14px; border: 1px solid #e3e3e3; border-radius: 8px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; flex-direction: column; gap: 3px">
+                  <div style="display: flex; align-items: center; justify-content: space-between">
+                    <span style="font-weight: 600">Server version</span>
+                    <span style="font-size: 12px; color: #5c5c5c">rev 418 · 2.4 KB</span>
+                  </div>
+                  <div style="font-size: 13px; color: #5c5c5c">Replaces the note on this device. Your text stays in the conflict copy.</div>
+                </div>
+                <button type="button" style="align-self: flex-start; height: 32px; padding: 0 12px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222">Keep server version</button>
+              </div>
+              <div style="padding: 14px; border: 1px solid #e3e3e3; border-radius: 8px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; flex-direction: column; gap: 3px">
+                  <div style="display: flex; align-items: center; justify-content: space-between">
+                    <span style="font-weight: 600">This device's version</span>
+                    <span style="font-size: 12px; color: #5c5c5c">conflict copy · 2.6 KB</span>
+                  </div>
+                  <div style="font-size: 13px; color: #5c5c5c">Puts your text back into the note and uploads it over the server version.</div>
+                </div>
+                <button type="button" style="align-self: flex-start; height: 32px; padding: 0 12px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222">Keep my version</button>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <button type="button" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: #7852ee; font-size: 13px; font-weight: 600; color: #ffffff">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="18" x="3" y="3" rx="1"></rect><rect width="8" height="18" x="13" y="3" rx="1"></rect></svg>
+                Compare side by side
+              </button>
+              <button type="button" style="height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-size: 13px; color: #5b36d6">Open conflict copy</button>
+              <span style="flex-grow: 1"></span>
+              <button type="button" style="height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-size: 13px; color: #5c5c5c">Merged by hand? Mark resolved</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #e3e3e3; border-radius: 10px">
+          <button type="button" aria-expanded="false" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 0; background: transparent; text-align: left; color: #222222">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a5300" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+            <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 14px; font-weight: 600">Reading list.md</span>
+              <span style="font-size: 12px; color: #5c5c5c">Inbox · today 11:05</span>
+            </span>
+            <span style="padding: 3px 8px; border-radius: 999px; background: #fff1d6; color: #7a4a00; font-size: 12px; font-weight: 600">Needs decision</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5c5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+        </div>
+
+        <div style="border: 1px solid #e3e3e3; border-radius: 10px">
+          <button type="button" aria-expanded="false" style="width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 0; background: transparent; text-align: left; color: #222222">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6e6e6e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+            <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 14px; font-weight: 600">Ideas.md</span>
+              <span style="font-size: 12px; color: #5c5c5c">You kept this device's version · uploading</span>
+            </span>
+            <span style="padding: 3px 8px; border-radius: 999px; background: #f0f0f0; color: #4a4a4a; font-size: 12px; font-weight: 600">Waiting for sync</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5c5c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

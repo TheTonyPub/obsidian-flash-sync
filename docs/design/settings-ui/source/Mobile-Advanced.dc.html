@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flash-sync · Mobile advanced</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#222222;background:#ffffff}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#5b36d6}a:hover{color:#4323b0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #ffffff; font-size: 15px; color: #222222; overflow: hidden">
+  <div style="height: 56px; flex-shrink: 0; display: flex; align-items: center; padding: 0 6px; border-bottom: 1px solid #e3e3e3; background: #f6f6f6">
+    <button type="button" aria-label="Back to community plugins" style="width: 44px; height: 44px; border: 0; background: transparent; color: #5b36d6; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+    </button>
+    <div style="flex-grow: 1; text-align: center; font-size: 17px; font-weight: 650">flash-sync</div>
+    <span style="width: 44px"></span>
+  </div>
+  <div style="flex-grow: 1; box-sizing: border-box; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+    <div role="tablist" aria-label="flash-sync settings" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px; border-radius: 10px; background: #efefef">
+      <a href="Mobile-Home.dc.html" role="tab" aria-selected="false" style="height: 38px; border-radius: 8px; font-size: 14px; color: #4a4a4a; text-decoration: none; display: flex; align-items: center; justify-content: center">Sync</a>
+      <a href="Mobile-Server.dc.html" role="tab" aria-selected="false" style="height: 38px; border-radius: 8px; font-size: 14px; color: #4a4a4a; text-decoration: none; display: flex; align-items: center; justify-content: center">Server</a>
+      <button type="button" role="tab" aria-selected="true" style="height: 38px; border: 0; border-radius: 8px; background: #ffffff; font-size: 14px; font-weight: 600; color: #222222; box-shadow: 0 1px 2px rgba(0,0,0,0.12)">Advanced</button>
+    </div>
+    <div style="font-size: 13px; color: #5c5c5c">Defaults work for most vaults. Changes save immediately.</div>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #5c5c5c">Sync</h2>
+      <div style="border: 1px solid #e3e3e3; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+          <label for="m-limit" style="font-weight: 600">Inline note limit</label>
+          <div style="display: flex; align-items: center; border: 1px solid #dcdcdc; border-radius: 10px; overflow: hidden">
+            <input id="m-limit" type="number" inputmode="numeric" value="512" style="width: 76px; box-sizing: border-box; height: 44px; padding: 0 10px; border: 0; font-size: 16px; color: #222222; text-align: right">
+            <span style="height: 44px; padding: 0 10px; display: flex; align-items: center; background: #f6f6f6; border-left: 1px solid #dcdcdc; font-size: 14px; color: #5c5c5c">KiB</span>
+          </div>
+        </div>
+        <div style="font-size: 13px; color: #5c5c5c">Larger files use attachment storage. Default 512. Changing it reconnects sync.</div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #5c5c5c">This device</h2>
+      <div style="border: 1px solid #e3e3e3; border-radius: 12px">
+        <button type="button" style="width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 14px; border: 0; background: transparent; text-align: left; font-size: 15px; color: #222222">
+          <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-weight: 600">Device ID</span>
+            <span style="font-size: 13px; color: #5c5c5c; font-family: ui-monospace, SFMono-Regular, Menlo, monospace">3f9c2b7e-…-a1e2</span>
+          </span>
+          <span style="font-size: 14px; color: #5b36d6">Copy</span>
+        </button>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #5c5c5c">Diagnostics</h2>
+      <div style="border: 1px solid #e3e3e3; border-radius: 12px">
+        <label style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px">
+          <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-weight: 600">Debug logging</span>
+            <span style="font-size: 13px; color: #5c5c5c">Extra events in the developer console</span>
+          </span>
+          <input type="checkbox" role="switch" aria-label="Debug logging" style="position: absolute; opacity: 0; width: 1px; height: 1px">
+          <span style="width: 50px; height: 30px; flex-shrink: 0; border-radius: 15px; background: #cfcfcf; position: relative; display: block">
+            <span style="position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.25)"></span>
+          </span>
+        </label>
+        <button type="button" style="width: 100%; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 14px; border: 0; border-top: 1px solid #ececec; background: transparent; text-align: left; font-size: 15px; color: #222222">
+          <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-weight: 600">Copy status report</span>
+            <span style="font-size: 13px; color: #5c5c5c">For bug reports · no passwords or keys</span>
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+        </button>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

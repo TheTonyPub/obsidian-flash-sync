@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flash-sync · Mobile send settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#222222;background:#ffffff}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#5b36d6}a:hover{color:#4323b0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #ffffff; font-size: 15px; color: #222222; overflow: hidden">
+  <div style="height: 56px; flex-shrink: 0; display: flex; align-items: center; padding: 0 6px; border-bottom: 1px solid #e3e3e3; background: #f6f6f6">
+    <a href="Mobile-Home.dc.html" style="min-width: 64px; height: 44px; padding: 0 10px; display: flex; align-items: center; font-size: 16px; color: #5b36d6; text-decoration: none">Cancel</a>
+    <div style="flex-grow: 1; text-align: center; font-size: 17px; font-weight: 650">Send settings</div>
+    <span style="min-width: 64px"></span>
+  </div>
+  <div style="flex-grow: 1; box-sizing: border-box; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 20px; overflow: hidden">
+    <div style="font-size: 14px; color: #4a4a4a">The other device needs the link and the phrase. Send them separately — for example, link by message, phrase out loud.</div>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <label for="m-phrase" style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #5c5c5c">1 · Code phrase</label>
+      <div style="display: flex; gap: 8px">
+        <input id="m-phrase" value="maple-orbit-seven-quartz" autocapitalize="off" style="flex-grow: 1; min-width: 0; box-sizing: border-box; height: 48px; padding: 0 12px; border: 1px solid #dcdcdc; border-radius: 10px; font-size: 16px; color: #222222; font-family: ui-monospace, SFMono-Regular, Menlo, monospace">
+        <button type="button" aria-label="Generate a new phrase" style="width: 48px; height: 48px; flex-shrink: 0; border: 1px solid #dcdcdc; border-radius: 10px; background: #ffffff; color: #222222; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+        </button>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #5c5c5c">2 · Send the link</div>
+      <button type="button" style="width: 100%; height: 50px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; background: #7852ee; font-size: 16px; font-weight: 600; color: #ffffff">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><path d="m16 6-4-4-4 4"></path><path d="M12 2v13"></path></svg>
+        Share link…
+      </button>
+      <button type="button" style="width: 100%; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #dcdcdc; border-radius: 12px; background: #ffffff; font-size: 15px; color: #222222">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+        Copy link
+      </button>
+    </section>
+
+    <section style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #e3e3e3; border-radius: 12px">
+      <div role="img" aria-label="QR code with the protected transfer link" style="flex-shrink: 0; padding: 6px; border-radius: 6px; background: #ffffff; border: 1px solid #ececec">
+        <div style="display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); width: 100px; height: 100px">
+          <sc-for list="{{cells}}" as="c" hint-placeholder-count="625">
+            <sc-if value="{{c.on}}" hint-placeholder-val="{{false}}"><span style="display: block; background: #141414"></span></sc-if>
+            <sc-if value="{{c.off}}" hint-placeholder-val="{{true}}"><span style="display: block; background: #ffffff"></span></sc-if>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="font-weight: 600">Or scan from another phone</div>
+        <div style="font-size: 13px; color: #5c5c5c">Point its camera at this code, then type the phrase there.</div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #3a3a3a">
+      <div style="display: flex; align-items: center; gap: 8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#087a3a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Server, username and password (encrypted)</div>
+      <div style="display: flex; align-items: center; gap: 8px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#087a3a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Attachment storage (S3)</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const n = 25;
+    let seed = 20260930;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const corners = [[0, 0], [0, n - 7], [n - 7, 0]];
+    const cells = [];
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        let on = null;
+        for (const [or, oc] of corners) {
+          const dr = r - or, dc = c - oc;
+          if (dr >= -1 && dr <= 7 && dc >= -1 && dc <= 7) {
+            if (dr < 0 || dr > 6 || dc < 0 || dc > 6) on = false;
+            else on = dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4);
+          }
+        }
+        if (on === null && (r === 6 || c === 6)) on = (r + c) % 2 === 0;
+        if (on === null && r >= 16 && r <= 20 && c >= 16 && c <= 20) {
+          const dr = r - 18, dc = c - 18;
+          on = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+        }
+        if (on === null) on = rnd() > 0.52;
+        cells.push({ on, off: !on });
+      }
+    }
+    return { cells };
+  }
+}
+</script>
+</body>
+</html>
