@@ -838,7 +838,9 @@ describe("settings transfer", () => {
 
     checkbox.checked = true;
     checkbox.dispatch("change");
-    await vi.waitFor(() => expect(modal.contentEl.textContent).toContain("Unprotected — contains readable credentials."));
+    // QR generation is CPU-bound; under a loaded CI runner it can exceed the default 1 s.
+    await vi.waitFor(() => expect(modal.contentEl.textContent).toContain("Unprotected — contains readable credentials."),
+      { timeout: 10_000 });
     expect(modal.contentEl.textContent).toContain("Password, readable by anyone with the code");
   });
 
