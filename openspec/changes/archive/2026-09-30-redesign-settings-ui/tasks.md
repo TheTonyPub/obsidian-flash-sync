@@ -38,4 +38,4 @@
 
 ## 7. Owner acceptance (deferrable)
 
-- [ ] 7.1 In a disposable vault, compare desktop light, desktop dark and one mobile device against `docs/design/settings-ui/reference/`: synchronized, conflict, sign-in failure, first run, Server draft and Send settings. Done when: captures are saved under `docs/design/settings-ui/captures/` or deviations are listed in `design-qa.md`.
+- [x] 7.1 In a disposable vault, compare desktop light, desktop dark and one mobile device against `docs/design/settings-ui/reference/`: synchronized, conflict, sign-in failure, first run, Server draft and Send settings. Done when: captures are saved under `docs/design/settings-ui/captures/` or deviations are listed in `design-qa.md`. Owner accepted the live result on 2026-09-30; reference captures remain pending.
