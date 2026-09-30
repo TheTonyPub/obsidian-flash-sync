@@ -73,12 +73,20 @@ export class SyncStatus {
   conflictPaths: string[] = [];
   blobsPending = 0;
   lastError = "";
+  /** Display-only wall-clock time of the last clean reconciliation; never used for ordering. */
+  lastReconciledAt = 0;
   onReconnect?: () => void;
   private readonly listeners = new Set<() => void>();
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Mark reconciliation complete and record its time when no local work remains. */
+  markReconciled(now = Date.now()): void {
+    this.reconciled = true;
+    if (this.pending === 0 && this.blobsPending === 0) this.lastReconciledAt = now;
   }
 
   markError(key: string): void { this.errorKeys.add(key); this.refresh(); }

@@ -1,76 +1,21 @@
 import { EditorView } from "@codemirror/view";
-import { App, MarkdownView, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, setIcon } from "obsidian";
-import QRCode from "qrcode";
+import { App, MarkdownView, Notice, Platform, Plugin, TFile, setIcon } from "obsidian";
 import { normalizePath } from "@flash-osidian-sync/protocol";
 import { connectExistingNatsBucket, connectVault, SyncStatus, type KvPort } from "./connection.js";
 import { LocalStore } from "./local-store.js";
 import { MarkdownSyncEngine, type MarkdownVault } from "./markdown-sync.js";
 import { CONFLICT_REVIEW_FOLDER, formatConflictReviewNote } from "./conflict-review-note.js";
 import { connectS3Blob, DEFAULT_INLINE_LIMIT, type BlobPort } from "./blob-storage.js";
-import { createLogger, errorSummary } from "./diagnostics.js";
-import { decryptTransfer, encryptTransfer, transferVersion, type TransferConfig } from "./config-transfer.js";
+import { buildStatusReport, createLogger, errorSummary } from "./diagnostics.js";
+import { encryptTransfer, type TransferConfig } from "./config-transfer.js";
 import { PLUGIN_ID, registerImportUriHandlers } from "./plugin-identity.js";
-import { validateSettingsDraft, type SettingsField, type SettingsValidationErrors } from "./settings-validation.js";
+import type { SettingsField, SettingsValidationErrors } from "./settings-validation.js";
 import type { ConflictHistoryEntry, ConflictRecord } from "./local-store.js";
-import { overviewStatusPresentation, statusPresentation } from "./status-presentation.js";
-
-interface EasySyncSettings {
-  vaultId: string;
-  boundVaultId: string;
-  deviceId: string;
-  server: string;
-  username: string;
-  passwordSecretKey: string;
-  s3Endpoint: string;
-  s3Bucket: string;
-  s3Region: string;
-  s3AccessKeyId: string;
-  s3SecretKeySecretKey: string;
-  inlineLimit: number;
-  debugLogging: boolean;
-  statusBarMode: "minimal" | "extended";
-}
-
-type SettingsSection = "overview" | "connection" | "attachments" | "device-transfer" | "advanced";
-type SettingsApplyResult =
-  | { kind: "applied" }
-  | { kind: "not-configured" }
-  | { kind: "validation-error"; errors: SettingsValidationErrors }
-  | { kind: "persistence-error"; message: string }
-  | { kind: "connection-error"; message: string };
-
-type ConflictComparison = {
-  remote: Record<string, unknown>;
-  local: Record<string, unknown>;
-  stale: { remote: boolean; local: boolean };
-};
-
-interface SettingsDraft extends EasySyncSettings {
-  natsPassword: string;
-  s3Secret: string;
-  attachmentsEnabled: boolean;
-}
-
-function draftFor(settings: EasySyncSettings): SettingsDraft {
-  return { ...settings, natsPassword: "", s3Secret: "", attachmentsEnabled: Boolean(settings.s3Endpoint || settings.s3Bucket ||
-    settings.s3AccessKeyId || settings.s3SecretKeySecretKey || (settings.s3Region && settings.s3Region !== "us-east-1")) };
-}
-
-function validateDraft(draft: SettingsDraft, passwordAvailable: boolean, s3SecretAvailable: boolean, requireConnection = false) {
-  return validateSettingsDraft({
-    vaultId: draft.vaultId,
-    server: draft.server,
-    username: draft.username,
-    hasPassword: Boolean(draft.natsPassword || (draft.passwordSecretKey && passwordAvailable)),
-    attachmentsEnabled: draft.attachmentsEnabled,
-    s3Endpoint: draft.s3Endpoint,
-    s3Bucket: draft.s3Bucket,
-    s3Region: draft.s3Region,
-    s3AccessKeyId: draft.s3AccessKeyId,
-    hasS3Secret: Boolean(draft.s3Secret || (draft.s3SecretKeySecretKey && s3SecretAvailable)),
-    inlineLimitKiB: draft.inlineLimit / 1024,
-  }, requireConnection);
-}
+import { statusPresentation } from "./status-presentation.js";
+import { draftFor, validateDraft, type AdvancedUpdate, type ConflictComparison, type EasySyncSettings,
+  type SettingsApplyResult, type SettingsDraft, type SettingsHost, type SettingsSection } from "./settings/model.js";
+import { EasySyncSettingTab } from "./settings/tab.js";
+import { ImportConfigModal } from "./settings/transfer-modals.js";
 
 function validIncluded(path: string): boolean {
   if (path === CONFLICT_REVIEW_FOLDER || path.startsWith(`${CONFLICT_REVIEW_FOLDER}/`)) return false;
@@ -156,7 +101,7 @@ class ObsidianMarkdownVault implements MarkdownVault {
   }
 }
 
-export default class EasySyncPlugin extends Plugin {
+export default class EasySyncPlugin extends Plugin implements SettingsHost {
   config!: EasySyncSettings;
   private engine?: MarkdownSyncEngine;
   private store?: LocalStore;
@@ -314,6 +259,7 @@ export default class EasySyncPlugin extends Plugin {
       s3Endpoint: transfer.s3Endpoint, s3Bucket: transfer.s3Bucket, s3Region: transfer.s3Region,
       s3AccessKeyId: transfer.s3AccessKeyId, inlineLimit: transfer.inlineLimit,
       natsPassword: transfer.natsPassword, s3Secret: transfer.s3SecretKey,
+      attachmentsEnabled: Boolean(transfer.s3Endpoint || transfer.s3Bucket || transfer.s3AccessKeyId || transfer.s3SecretKey),
     });
     return this.applyDraft(draft, "all");
   }
@@ -328,27 +274,30 @@ export default class EasySyncPlugin extends Plugin {
       }
       const previous = this.config;
       const candidate = draftFor(previous);
-      const connectionFields = section === "connection" || section === "all";
-      const attachmentFields = section === "attachments" || section === "all";
+      // Server stages connection and attachment storage as one draft and reconnects once.
+      const serverFields = section === "server" || section === "all";
       const advancedFields = section === "advanced" || section === "all";
-      if (connectionFields) Object.assign(candidate, { vaultId: submittedDraft.vaultId, server: submittedDraft.server,
-        username: submittedDraft.username, natsPassword: submittedDraft.natsPassword });
-      if (attachmentFields) Object.assign(candidate, { s3Endpoint: submittedDraft.s3Endpoint, s3Bucket: submittedDraft.s3Bucket,
-        s3Region: submittedDraft.s3Region, s3AccessKeyId: submittedDraft.s3AccessKeyId, s3Secret: submittedDraft.s3Secret,
-        attachmentsEnabled: submittedDraft.attachmentsEnabled });
+      if (serverFields) {
+        Object.assign(candidate, { vaultId: submittedDraft.vaultId, server: submittedDraft.server,
+          username: submittedDraft.username, natsPassword: submittedDraft.natsPassword,
+          attachmentsEnabled: Boolean(submittedDraft.attachmentsEnabled) });
+        // Attachment fields count only while storage is switched on; switched off, they are cleared.
+        Object.assign(candidate, submittedDraft.attachmentsEnabled
+          ? { s3Endpoint: submittedDraft.s3Endpoint, s3Bucket: submittedDraft.s3Bucket, s3Region: submittedDraft.s3Region,
+            s3AccessKeyId: submittedDraft.s3AccessKeyId, s3Secret: submittedDraft.s3Secret }
+          : { s3Endpoint: "", s3Bucket: "", s3Region: "us-east-1", s3AccessKeyId: "", s3Secret: "", s3SecretKeySecretKey: "" });
+      }
       if (advancedFields) Object.assign(candidate, { inlineLimit: submittedDraft.inlineLimit, debugLogging: submittedDraft.debugLogging,
         statusBarMode: submittedDraft.statusBarMode });
       const passwordAvailable = Boolean(candidate.natsPassword || (candidate.passwordSecretKey &&
         this.app.secretStorage.getSecret(candidate.passwordSecretKey)));
       const s3SecretAvailable = Boolean(candidate.s3Secret || (candidate.s3SecretKeySecretKey &&
         this.app.secretStorage.getSecret(candidate.s3SecretKeySecretKey)));
-      const validation = validateDraft(candidate, Boolean(passwordAvailable), Boolean(s3SecretAvailable),
-        section === "connection" || section === "all");
+      const validation = validateDraft(candidate, Boolean(passwordAvailable), Boolean(s3SecretAvailable), serverFields);
+      const server: SettingsField[] = ["vaultId", "server", "username", "hasPassword",
+        "s3Endpoint", "s3Bucket", "s3Region", "s3AccessKeyId", "hasS3Secret"];
       const scopedFields: Record<typeof section, SettingsField[]> = {
-        overview: [], connection: ["vaultId", "server", "username", "hasPassword"],
-        attachments: ["s3Endpoint", "s3Bucket", "s3Region", "s3AccessKeyId", "hasS3Secret"],
-        "device-transfer": [], advanced: ["inlineLimitKiB"], all: ["vaultId", "server", "username", "hasPassword",
-          "s3Endpoint", "s3Bucket", "s3Region", "s3AccessKeyId", "hasS3Secret", "inlineLimitKiB"],
+        sync: [], server, advanced: ["inlineLimitKiB"], all: [...server, "inlineLimitKiB"],
       };
       const errors = Object.fromEntries(Object.entries(validation.errors)
         .filter(([field]) => scopedFields[section].includes(field as SettingsField))) as SettingsValidationErrors;
@@ -356,21 +305,20 @@ export default class EasySyncPlugin extends Plugin {
       candidate.inlineLimit = validation.inlineLimit;
 
       const next: EasySyncSettings = { ...previous };
-      if (connectionFields) Object.assign(next, { vaultId: candidate.vaultId, server: candidate.server,
-        username: candidate.username });
-      if (attachmentFields) Object.assign(next, { s3Endpoint: candidate.s3Endpoint, s3Bucket: candidate.s3Bucket,
+      if (serverFields) Object.assign(next, { vaultId: candidate.vaultId, server: candidate.server,
+        username: candidate.username, s3Endpoint: candidate.s3Endpoint, s3Bucket: candidate.s3Bucket,
         s3Region: candidate.s3Region, s3AccessKeyId: candidate.s3AccessKeyId });
       if (advancedFields) Object.assign(next, { inlineLimit: candidate.inlineLimit, debugLogging: candidate.debugLogging,
         statusBarMode: candidate.statusBarMode });
       try {
-        if (connectionFields && candidate.natsPassword) {
+        if (serverFields && candidate.natsPassword) {
           next.passwordSecretKey = `${PLUGIN_ID}-nats-${crypto.randomUUID()}`;
           this.app.secretStorage.setSecret(next.passwordSecretKey, candidate.natsPassword);
         }
-        if (attachmentFields && validation.attachmentsConfigured && candidate.s3Secret) {
+        if (serverFields && validation.attachmentsConfigured && candidate.s3Secret) {
           next.s3SecretKeySecretKey = `${PLUGIN_ID}-s3-${crypto.randomUUID()}`;
           this.app.secretStorage.setSecret(next.s3SecretKeySecretKey, candidate.s3Secret);
-        } else if (attachmentFields && !validation.attachmentsConfigured) {
+        } else if (serverFields && !validation.attachmentsConfigured) {
           next.s3SecretKeySecretKey = "";
         }
         this.config = next;
@@ -386,16 +334,16 @@ export default class EasySyncPlugin extends Plugin {
       const reconnectFields: Array<keyof EasySyncSettings> = ["vaultId", "server", "username", "passwordSecretKey",
         "s3Endpoint", "s3Bucket", "s3Region", "s3AccessKeyId", "s3SecretKeySecretKey", "inlineLimit"];
       const reconnectNeeded = reconnectFields.some((field) => previous[field] !== next[field]);
-      if (attachmentFields && !validation.attachmentsConfigured) {
+      if (serverFields && !validation.attachmentsConfigured) {
         this.status.attachmentState = "NOT_CONFIGURED";
         this.status.attachmentError = "";
-      } else if (attachmentFields && validation.attachmentsConfigured && reconnectNeeded) {
+      } else if (serverFields && validation.attachmentsConfigured && reconnectNeeded) {
         this.status.attachmentState = "CONFIGURED";
         this.status.attachmentError = "";
       }
       if (!reconnectNeeded) return { kind: "applied" };
       this.resetAutomaticRetries(true);
-      if (connectionFields && !validation.configured) {
+      if (serverFields && !validation.configured) {
         this.automaticRetryBlocked = true;
         await this.disconnect();
         this.status.connectionState = "UNCONFIGURED";
@@ -417,15 +365,28 @@ export default class EasySyncPlugin extends Plugin {
     });
   }
 
-  async applyAdvancedUpdate(update: Partial<Pick<EasySyncSettings, "inlineLimit" | "debugLogging" | "statusBarMode">>): Promise<SettingsApplyResult> {
+  async applyAdvancedUpdate(update: AdvancedUpdate): Promise<SettingsApplyResult> {
     return this.applyDraft((settings) => ({ ...draftFor(settings), ...update }), "advanced");
   }
 
-  private reconcileAfter(trigger: string): void {
-    if (!this.engine) return;
+  async syncNow(): Promise<void> {
+    if (this.engine && this.status.connected) await this.reconcileAfter("manual");
+    else await this.connectNow();
+  }
+
+  statusReport(): string {
+    return buildStatusReport(this.status, this.config, {
+      pluginVersion: this.manifest?.version ?? "unknown",
+      platform: Platform.isMobile ? "mobile" : "desktop",
+      redact: (message) => this.redactDiagnostic(message),
+    });
+  }
+
+  private reconcileAfter(trigger: string): Promise<void> {
+    if (!this.engine) return Promise.resolve();
     this.logger.debug("reconcile.trigger", { trigger });
     const startedAt = performance.now();
-    void this.engine.reconcile().then(() => {
+    return this.engine.reconcile().then(() => {
       this.lastReconciledAt = Date.now();
       this.logger.debug("reconcile.trigger_complete", { trigger, durationMs: Math.round(performance.now() - startedAt) });
     }).catch((error: unknown) => {
@@ -437,7 +398,7 @@ export default class EasySyncPlugin extends Plugin {
 
   private requestLifecycleConnection(trigger: "online" | "resume"): void {
     if (this.engine && this.status.connected) {
-      this.reconcileAfter(trigger);
+      void this.reconcileAfter(trigger);
       return;
     }
     if (this.connectionAttempt) return;
@@ -713,662 +674,3 @@ export default class EasySyncPlugin extends Plugin {
   }
 }
 
-class ExportConfigModal extends Modal {
-  constructor(app: App, private readonly plugin: EasySyncPlugin) { super(app); }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.createEl("h2", { text: `Transfer ${PLUGIN_ID} settings` });
-    contentEl.createEl("p", { text: "Protect transfer codes with a phrase of at least eight characters. The phrase must be entered separately on the receiving device." });
-    let phrase = "";
-    let disableProtection = false;
-    const result = contentEl.createDiv();
-    new Setting(contentEl).setName("Code phrase")
-      .addText((input) => { input.inputEl.type = "password"; input.inputEl.autocomplete = "new-password";
-        input.onChange((value) => { phrase = value; }); });
-    const unsafeLabel = contentEl.createEl("label", { cls: "flash-sync-unprotected" });
-    const disableCheckbox = unsafeLabel.createEl("input", { attr: { type: "checkbox" } });
-    unsafeLabel.createSpan({ text: " Disable protection" });
-    const warning = contentEl.createEl("p", { cls: "flash-sync-warning" });
-    warning.textContent = "";
-    disableCheckbox.addEventListener("change", () => {
-      disableProtection = disableCheckbox.checked;
-      warning.textContent = disableProtection ? "Unprotected — contains readable credentials." : "";
-    });
-    new Setting(contentEl).addButton((button) => button.setButtonText("Create QR").onClick(async () => {
-      result.empty();
-      if (!disableProtection && phrase.length < 8) {
-        result.createEl("p", { text: "Enter a code phrase with at least eight characters." });
-        return;
-      }
-      try {
-        const payload = await this.plugin.exportConfig(disableProtection ? "" : phrase);
-        const uri = `obsidian://${PLUGIN_ID}-import?data=${encodeURIComponent(payload)}`;
-        const image = await QRCode.toDataURL(uri, { errorCorrectionLevel: "M", margin: 2, width: 400 });
-        result.createEl("img", { attr: { src: image, alt: `${PLUGIN_ID} settings QR` } });
-        result.createEl("p", { text: disableProtection
-          ? "Unprotected — contains readable credentials. Scan with iPhone Camera and open the Obsidian link."
-          : "Scan with iPhone Camera. Open the Obsidian link, then enter the code phrase." });
-        new Setting(result).addButton((copy) => copy.setButtonText("Copy transfer link").onClick(async () => {
-          await navigator.clipboard.writeText(uri);
-          new Notice("Transfer link copied");
-        }));
-      } catch (error) {
-        result.createEl("p", { text: this.plugin.safeDiagnostic(error) });
-      }
-    }));
-  }
-}
-
-class ImportConfigModal extends Modal {
-  constructor(app: App, private readonly plugin: EasySyncPlugin, private readonly initialPayload: string) { super(app); }
-
-  onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.createEl("h2", { text: `Import ${PLUGIN_ID} settings` });
-    let payload = this.initialPayload;
-    let phrase = "";
-    let decoded: TransferConfig | undefined;
-    const result = contentEl.createDiv();
-    const preview = contentEl.createDiv({ cls: "flash-sync-transfer-preview" });
-    const transferSetting = new Setting(contentEl);
-    const phraseSetting = new Setting(contentEl);
-    const updatePhraseRequirement = (): void => {
-      try {
-        phraseSetting.settingEl.toggle(transferVersion(payload) === 1);
-      } catch { phraseSetting.settingEl.toggle(false); }
-      decoded = undefined;
-      preview.empty();
-      result.empty();
-    };
-    transferSetting.setName("Transfer code")
-      .setDesc("Paste a transfer code, or open a transfer link from another device.")
-      .addTextArea((input) => input.setValue(payload).onChange((value) => { payload = value.trim(); updatePhraseRequirement(); }));
-    phraseSetting.setName("Code phrase")
-      .setDesc("Required for protected transfer codes.")
-      .addText((input) => { input.inputEl.type = "password"; input.inputEl.autocomplete = "current-password";
-        input.onChange((value) => { phrase = value; decoded = undefined; }); });
-    updatePhraseRequirement();
-    new Setting(contentEl).addButton((button) => {
-      button.setButtonText("Preview settings").onClick(async () => {
-        result.empty(); preview.empty(); button.setDisabled(true);
-        try {
-          decoded = await decryptTransfer(payload, phrase);
-          const validation = validateSettingsDraft({ vaultId: decoded.vaultId, server: decoded.server,
-            username: decoded.username, hasPassword: Boolean(decoded.natsPassword),
-            attachmentsEnabled: Boolean(decoded.s3Endpoint || decoded.s3Bucket || decoded.s3AccessKeyId || decoded.s3SecretKey),
-            s3Endpoint: decoded.s3Endpoint,
-            s3Bucket: decoded.s3Bucket, s3Region: decoded.s3Region, s3AccessKeyId: decoded.s3AccessKeyId,
-            hasS3Secret: Boolean(decoded.s3SecretKey), inlineLimitKiB: decoded.inlineLimit / 1024 });
-          if (Object.keys(validation.errors).length) throw new Error(Object.values(validation.errors)[0]);
-          preview.createEl("h3", { text: "Settings preview" });
-          preview.createEl("p", { text: `Vault: ${decoded.vaultId}` });
-          preview.createEl("p", { text: `Server: ${decoded.server}` });
-          preview.createEl("p", { text: decoded.s3Endpoint ? `Attachments: ${decoded.s3Bucket} (${decoded.s3Endpoint})` : "Attachments: not configured; files stay local." });
-          preview.createEl("p", { text: "Passwords and access keys are hidden." });
-          if (this.plugin.config.boundVaultId && this.plugin.config.boundVaultId !== decoded.vaultId) {
-            result.createEl("p", { text: "This device is bound to a different vault. Import is blocked." });
-            decoded = undefined;
-          } else {
-            new Setting(preview).addButton((apply) => apply.setButtonText("Import and connect").onClick(async () => {
-              if (!decoded) return;
-              apply.setDisabled(true);
-              try {
-                let outcome: SettingsApplyResult;
-                try { outcome = await this.plugin.importConfig(decoded); }
-                catch (error) { result.createEl("p", { text: `Unable to import: ${this.plugin.safeDiagnostic(error)}` }); return; }
-                if (outcome.kind === "applied") {
-                  new Notice(`${PLUGIN_ID} settings saved and connected`);
-                  this.close();
-                } else if (outcome.kind === "connection-error") {
-                  result.createEl("p", { text: "Settings saved. Connection failed." });
-                  result.createEl("p", { text: outcome.message });
-                  new Setting(result).addButton((retry) => retry.setButtonText("Retry connection").onClick(async () => {
-                    retry.setDisabled(true);
-                    try {
-                      const retried = await this.plugin.connectNow();
-                      if (retried.kind === "applied") this.close();
-                      else result.createEl("p", { text: retried.kind === "connection-error"
-                        ? `Connection is still unavailable. Settings remain saved. ${retried.message}`
-                        : "Connection is still unavailable. Settings remain saved." });
-                    } catch (error) {
-                      result.createEl("p", { text: `Retry failed. Settings remain saved. ${this.plugin.safeDiagnostic(error)}` });
-                    } finally { retry.setDisabled(false); }
-                  }));
-                } else {
-                  result.createEl("p", { text: outcome.kind === "validation-error" ? Object.values(outcome.errors)[0] ?? "Invalid settings." :
-                    outcome.kind === "persistence-error" ? `Could not save settings: ${outcome.message}` : "Settings were not connected." });
-                }
-              } finally { apply.setDisabled(false); }
-            }));
-          }
-        } catch (error) { result.createEl("p", { text: `Unable to preview: ${this.plugin.safeDiagnostic(error)}` }); }
-        finally { button.setDisabled(false); }
-      });
-    });
-  }
-}
-
-class DraftSwitchModal extends Modal {
-  constructor(app: App, private readonly from: string, private readonly resolveChoice: (choice: "apply" | "discard" | "keep") => void) { super(app); }
-  onOpen(): void {
-    this.contentEl.empty();
-    this.contentEl.createEl("h2", { text: "Unapplied changes" });
-    this.contentEl.createEl("p", { text: `Apply changes in ${this.from}, discard them, or keep editing. Closing settings discards unapplied changes.` });
-    const actions = this.contentEl.createDiv({ cls: "flash-sync-actions" });
-    const apply = actions.createEl("button", { text: "Apply", attr: { type: "button" } });
-    apply.classList.add("mod-cta");
-    apply.addEventListener("click", () => this.finish("apply"));
-    actions.createEl("button", { text: "Discard", attr: { type: "button" } }).addEventListener("click", () => this.finish("discard"));
-    actions.createEl("button", { text: "Keep editing", attr: { type: "button" } }).addEventListener("click", () => this.finish("keep"));
-  }
-  onClose(): void { this.resolveChoice("keep"); }
-  private finish(choice: "apply" | "discard" | "keep"): void { this.resolveChoice(choice); this.close(); }
-}
-
-class ConfirmConflictActionModal extends Modal {
-  constructor(app: App, private readonly action: string, private readonly onConfirm: () => Promise<void>) { super(app); }
-
-  onOpen(): void {
-    this.contentEl.empty();
-    this.contentEl.createEl("h2", { text: this.action });
-    this.contentEl.createEl("p", { text: "This applies only to the selected conflict after live versions are checked again." });
-    const result = this.contentEl.createDiv();
-    new Setting(this.contentEl).addButton((button) => button.setButtonText("Confirm").setCta().onClick(async () => {
-      try { await this.onConfirm(); this.close(); }
-      catch (error) { result.empty(); result.createEl("p", { text: error instanceof Error ? error.message : String(error) }); }
-    }));
-    new Setting(this.contentEl).addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()));
-  }
-}
-
-class EasySyncSettingTab extends PluginSettingTab {
-  private unsubscribe?: () => void;
-  private drafts = new Map<SettingsSection, SettingsDraft>();
-  private activeSection: SettingsSection = "overview";
-  private panel?: HTMLElement;
-  private summary?: HTMLElement;
-  private overviewStatus?: HTMLElement;
-  private conflictRegion?: HTMLElement;
-  private overviewActions?: HTMLElement;
-  private attachmentSettingsAction?: HTMLButtonElement;
-  private fieldRows = new Map<SettingsField, { input: HTMLInputElement; row: Setting; help: string }>();
-  private transferMode: "import" | "export" = "import";
-  private busy = false;
-  private navigationDecisionPending = false;
-  private lastInlineLimitCommit?: string;
-
-  constructor(app: App, private readonly plugin: EasySyncPlugin) { super(app, plugin); }
-
-  hide(): void {
-    this.unsubscribe?.(); this.unsubscribe = undefined;
-    this.drafts.clear(); this.fieldRows.clear();
-  }
-
-  onApplied(settings: EasySyncSettings, section: SettingsSection | "all"): void {
-    if (section === "all") this.drafts.clear();
-    else {
-      this.drafts.delete(section);
-      for (const [key, draft] of this.drafts) {
-        if (!this.isDirty(key, draft)) this.drafts.delete(key);
-      }
-    }
-    this.updateSummary();
-    if (this.panel && (section === "all" || section === this.activeSection)) this.renderSection();
-  }
-
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    const root = containerEl.createDiv({ cls: "flash-sync-settings" });
-    // Obsidian's settings pane hides the first h1; use its visible native section heading style.
-    root.createEl("h2", { text: PLUGIN_ID, cls: "flash-sync-heading" });
-    root.createEl("p", { text: `Vault ID: ${this.plugin.config.vaultId}`, cls: "flash-sync-vault-id" });
-    this.summary = undefined;
-    const nav = root.createDiv({ cls: "flash-sync-nav" });
-    const tabs = nav.createDiv({ cls: "flash-sync-nav-buttons", attr: { role: "tablist", "aria-label": "Sync settings" } });
-    const selectorId = "flash-sync-section-select";
-    nav.createEl("label", { text: "Settings section", cls: "flash-sync-nav-select-label", attr: { for: selectorId } });
-    const selector = nav.createEl("select", { cls: "flash-sync-nav-select", attr: { id: selectorId, "aria-label": "Settings section" } });
-    const sections: Array<[SettingsSection, string]> = [["overview", "Overview"], ["connection", "Connection"],
-      ["attachments", "Attachments"], ["device-transfer", "Device transfer"], ["advanced", "Advanced"]];
-    for (const [section, label] of sections) {
-      const button = tabs.createEl("button", { text: label, attr: { type: "button", role: "tab", "aria-controls": `flash-sync-panel-${section}` } });
-      button.addEventListener("click", () => { void this.selectSection(section); });
-      button.addEventListener("keydown", (event) => {
-        const keyEvent = event as KeyboardEvent;
-        const currentIndex = sections.findIndex(([candidate]) => candidate === this.activeSection);
-        const nextIndex = keyEvent.key === "Home" ? 0 : keyEvent.key === "End" ? sections.length - 1
-          : keyEvent.key === "ArrowRight" ? (currentIndex + 1) % sections.length
-            : keyEvent.key === "ArrowLeft" ? (currentIndex + sections.length - 1) % sections.length : -1;
-        if (nextIndex < 0) return;
-        keyEvent.preventDefault();
-        void this.selectSection(sections[nextIndex][0]).then(() => {
-          this.containerEl.querySelector<HTMLButtonElement>(`button[role="tab"][aria-controls="flash-sync-panel-${this.activeSection}"]`)?.focus();
-        });
-      });
-      selector.createEl("option", { text: label, attr: { value: section } });
-    }
-    selector.value = this.activeSection;
-    selector.addEventListener("change", () => { void this.selectSection(selector.value as SettingsSection); });
-    this.panel = root.createDiv({ cls: "flash-sync-panel", attr: { id: `flash-sync-panel-${this.activeSection}`, role: "tabpanel" } });
-    this.panel.inert = this.busy;
-    this.renderSection();
-    this.updateNavigation(tabs);
-    this.unsubscribe?.();
-    this.unsubscribe = this.plugin.status.subscribe(() => this.updateSummary());
-  }
-
-  private updateNavigation(tabs: HTMLElement): void {
-    for (const button of Array.from(tabs.querySelectorAll<HTMLButtonElement>("button[role=tab]"))) {
-      const selected = button.getAttribute("aria-controls") === `flash-sync-panel-${this.activeSection}`;
-      button.setAttribute("aria-selected", String(selected));
-      button.tabIndex = selected ? 0 : -1;
-    }
-  }
-
-  private currentDraft(section = this.activeSection): SettingsDraft {
-    let draft = this.drafts.get(section);
-    if (!draft) { draft = draftFor(this.plugin.config); this.drafts.set(section, draft); }
-    return draft;
-  }
-
-  private isDirty(section: SettingsSection, draft = this.currentDraft(section)): boolean {
-    const fields: Record<SettingsSection, Array<keyof SettingsDraft>> = {
-      overview: [], connection: ["vaultId", "server", "username", "passwordSecretKey", "natsPassword"],
-      attachments: ["s3Endpoint", "s3Bucket", "s3Region", "s3AccessKeyId", "s3SecretKeySecretKey", "s3Secret"],
-      "device-transfer": [], advanced: ["inlineLimit", "debugLogging", "statusBarMode"],
-    };
-    if (section === "attachments" && draft.attachmentsEnabled !== Boolean(this.plugin.config.s3Endpoint || this.plugin.config.s3Bucket ||
-      this.plugin.config.s3AccessKeyId || this.plugin.config.s3SecretKeySecretKey ||
-      (this.plugin.config.s3Region && this.plugin.config.s3Region !== "us-east-1"))) return true;
-    return fields[section].some((field) => draft[field] !== (field in this.plugin.config ? this.plugin.config[field as keyof EasySyncSettings] : ""));
-  }
-
-  private async selectSection(next: SettingsSection): Promise<void> {
-    if (this.busy || this.navigationDecisionPending || next === this.activeSection) return;
-    if (this.isDirty(this.activeSection)) {
-      this.navigationDecisionPending = true;
-      let choice: "apply" | "discard" | "keep";
-      try {
-        choice = await new Promise<"apply" | "discard" | "keep">((resolve) => {
-          new DraftSwitchModal(this.app, this.activeSection, resolve).open();
-        });
-      } finally { this.navigationDecisionPending = false; }
-      if (choice === "keep") return;
-      if (choice === "discard") this.drafts.delete(this.activeSection);
-      if (choice === "apply") {
-        const outcome = await this.applyActiveDraft();
-        if (outcome.kind === "validation-error" || outcome.kind === "persistence-error") return;
-      }
-    }
-    this.activeSection = next;
-    this.display();
-  }
-
-  private updateSummary(): void {
-    this.updateOverviewStatus();
-    if (!this.summary) return;
-    this.summary.empty();
-    const status = this.plugin.status;
-    const connection = status.connectionState === "CONNECTED"
-      ? (status.pending > 0 ? `Connected · ${status.pending} pending` : status.blobsPending > 0 ? "Connected · attachments transferring" : "Connected")
-      : status.connectionState === "CONNECTING" ? "Connecting…"
-        : status.connectionState === "AUTH_ERROR" ? "Authentication error"
-          : status.connectionState === "UNCONFIGURED" ? "Not configured" : "Offline";
-    const attachment = status.attachmentState === "NOT_CONFIGURED" ? "Not configured · files remain local"
-      : status.attachmentState === "CONFIGURED" ? "Configured" : status.attachmentState === "CONFIGURATION_ERROR"
-        ? "Configuration error" : "Transfer error";
-    if (this.activeSection !== "overview") {
-      this.summary.createEl("p", { text: `Sync server: ${connection} · Attachments: ${attachment}` });
-      const details = (label: string, message: string): void => {
-        const disclosure = this.summary!.createEl("details");
-        disclosure.createEl("summary", { text: label });
-        disclosure.createEl("p", { text: this.plugin.safeDiagnostic(message) });
-      };
-      if (status.connectionError) details("Connection details", status.connectionError);
-      if (status.attachmentError) details("Attachment details", status.attachmentError);
-      return;
-    }
-    const row = (label: string, value: string): void => {
-      const item = this.summary!.createDiv({ cls: "flash-sync-status-row" });
-      item.createEl("span", { text: label });
-      item.createEl("span", { text: value });
-    };
-    row("Sync server", connection);
-    row("Attachments", attachment);
-    row("Pending Markdown changes", String(status.pending));
-    row("Attachment transfers", String(status.blobsPending));
-    const details = (label: string, message: string): void => {
-      const disclosure = this.summary!.createEl("details", { cls: "flash-sync-error" });
-      disclosure.createEl("summary", { text: label });
-      disclosure.createEl("p", { text: this.plugin.safeDiagnostic(message) });
-    };
-    if (status.connectionError) details("Connection details", status.connectionError);
-    if (status.attachmentError) details("Attachment details", status.attachmentError);
-    if (status.lastError && !status.connectionError && !status.attachmentError) details("Technical details", status.lastError);
-    if (this.activeSection === "overview") {
-      this.updateAttachmentSettingsAction();
-      if (this.conflictRegion) void this.renderConflicts();
-    }
-  }
-
-  private updateOverviewStatus(): void {
-    if (!this.overviewStatus || this.activeSection !== "overview") return;
-    const presentation = overviewStatusPresentation(this.plugin.status);
-    this.overviewStatus.empty();
-    this.overviewStatus.classList.remove("flash-sync-status-dot-green", "flash-sync-status-dot-yellow", "flash-sync-status-dot-red", "flash-sync-status-dot-gray");
-    this.overviewStatus.classList.add(`flash-sync-status-dot-${presentation.color}`);
-    this.overviewStatus.setAttribute("aria-label", `Sync status: ${presentation.label}`);
-    this.overviewStatus.createSpan({ cls: "flash-sync-status-dot", attr: { "aria-hidden": "true" } });
-    this.overviewStatus.createSpan({ text: presentation.label });
-  }
-
-  private renderSection(): void {
-    const panel = this.panel;
-    if (!panel) return;
-    panel.empty();
-    panel.id = `flash-sync-panel-${this.activeSection}`;
-    this.summary = undefined;
-    this.overviewStatus = undefined;
-    this.overviewActions = undefined;
-    this.attachmentSettingsAction = undefined;
-    this.fieldRows.clear();
-    if (this.activeSection !== "overview") {
-      this.summary = panel.createDiv({ cls: "flash-sync-section-status" });
-      this.updateSummary();
-    }
-    if (this.activeSection === "overview") this.renderOverview(panel);
-    else if (this.activeSection === "connection") this.renderConnection(panel);
-    else if (this.activeSection === "attachments") this.renderAttachments(panel);
-    else if (this.activeSection === "device-transfer") this.renderTransfer(panel);
-    else this.renderAdvanced(panel);
-  }
-
-  private renderOverview(panel: HTMLElement): void {
-    panel.createEl("h2", { text: "Sync overview" });
-    this.overviewStatus = panel.createDiv({ cls: "flash-sync-overview-indicator", attr: { role: "status", "aria-live": "polite" } });
-    this.updateOverviewStatus();
-    this.summary = panel.createDiv({ cls: "flash-sync-overview-status" });
-    this.updateSummary();
-    const actions = panel.createDiv({ cls: "flash-sync-actions" });
-    this.overviewActions = actions;
-    if (this.plugin.status.connectionState === "UNCONFIGURED") {
-      const importButton = actions.createEl("button", { text: "Import settings", attr: { type: "button" } });
-      importButton.classList.add("mod-cta");
-      importButton.addEventListener("click", () => {
-        new ImportConfigModal(this.app, this.plugin, "").open();
-      });
-      actions.createEl("button", { text: "Manual setup", attr: { type: "button" } }).addEventListener("click", () => {
-        this.activeSection = "connection"; this.display();
-      });
-    } else {
-      actions.createEl("button", { text: "Retry connection", attr: { type: "button" } }).addEventListener("click", (event) => {
-        const button = event.currentTarget as HTMLButtonElement;
-        button.disabled = true;
-        void this.plugin.connectNow().finally(() => { button.disabled = false; });
-      });
-      actions.createEl("button", { text: "Edit connection", attr: { type: "button" } }).addEventListener("click", () => {
-        this.activeSection = "connection"; this.display();
-      });
-    }
-    this.updateAttachmentSettingsAction();
-    this.conflictRegion = panel.createDiv({ cls: "flash-sync-conflicts" });
-    void this.renderConflicts();
-  }
-
-  private updateAttachmentSettingsAction(): void {
-    const actions = this.overviewActions;
-    if (!actions || this.activeSection !== "overview") return;
-    if (!this.attachmentSettingsAction) {
-      const button = actions.createEl("button", { text: "Check attachment settings", attr: { type: "button" } });
-      button.addEventListener("click", () => {
-        if (this.busy) return;
-        this.activeSection = "attachments";
-        this.display();
-      });
-      this.attachmentSettingsAction = button;
-    }
-    const state = this.plugin.status.attachmentState;
-    this.attachmentSettingsAction.hidden = state !== "CONFIGURATION_ERROR" && state !== "TRANSFER_ERROR";
-  }
-
-  private async renderConflicts(): Promise<void> {
-    const region = this.conflictRegion;
-    if (!region) return;
-    const conflicts = await this.plugin.getConflicts();
-    if (region !== this.conflictRegion || this.activeSection !== "overview") return;
-    region.empty();
-    region.createEl("h3", { text: `Conflicts (${conflicts.length})` });
-    if (!conflicts.length) region.createEl("p", { text: "No unresolved conflicts." });
-    for (const conflict of conflicts) {
-      const name = conflict.originalPath.split("/").at(-1) || conflict.originalPath;
-      const item = region.createEl("details", { cls: "flash-sync-conflict-item" });
-      const status = conflict.lifecycle === "pending-sync" ? "Waiting for sync" : "Needs review";
-      item.createEl("summary", { text: `${name} · ${status}` });
-      const body = item.createDiv({ cls: "flash-sync-conflict-body" });
-      body.createEl("p", { text: `Original: ${conflict.originalPath}`, cls: "flash-sync-conflict-path" });
-      body.createEl("p", { text: `Preserved copy: ${conflict.copyPath}`, cls: "flash-sync-conflict-path" });
-      body.createEl("p", { text: conflict.lifecycle === "pending-sync"
-        ? "Waiting for the selected change to synchronize." : "Review the separate comparison note before choosing." });
-      const actions = body.createDiv({ cls: "flash-sync-conflict-actions" });
-      new Setting(actions).addButton((button) => button.setButtonText("Open copy").onClick(async () => {
-        await this.app.workspace.openLinkText(conflict.copyPath, "", false);
-      }));
-      new Setting(actions).addButton((button) => button.setButtonText("Review comparison").onClick(async () => {
-        try { await this.plugin.createConflictReview(conflict.operationId); }
-        catch (error) { new Notice(`Unable to create conflict review: ${this.plugin.safeDiagnostic(error)}`); }
-      }));
-      if (conflict.lifecycle !== "pending-sync") {
-        new Setting(actions).addButton((button) => button.setButtonText("Keep remote").setCta().onClick(() => {
-          this.confirmConflictAction("Keep remote", () => this.plugin.keepRemote(conflict.operationId));
-        }));
-        new Setting(actions).addButton((button) => button.setButtonText("Keep local copy").onClick(() => {
-          this.confirmConflictAction("Keep local copy", () => this.plugin.keepLocalCopy(conflict.operationId));
-        }));
-        new Setting(actions).addButton((button) => button.setButtonText("Mark resolved after manual edit or delete").onClick(() => {
-          this.confirmConflictAction("Mark resolved", () => this.plugin.markConflictResolved(conflict.operationId));
-        }));
-      }
-    }
-    const history = await this.plugin.getConflictHistory();
-    if (region !== this.conflictRegion || this.activeSection !== "overview") return;
-    const historyRegion = region.createEl("details", { cls: "flash-sync-conflict-history" });
-    historyRegion.createEl("summary", { text: "Conflict history" });
-    for (const event of history) historyRegion.createEl("p", { text: `${event.event ?? "event"}: ${event.outcome ?? event.context ?? "recorded"}` });
-  }
-
-  private confirmConflictAction(action: string, operation: () => Promise<void>): void {
-    new ConfirmConflictActionModal(this.app, action, async () => { await operation(); await this.renderConflicts(); }).open();
-  }
-
-  private addText(panel: HTMLElement, field: SettingsField, name: string, help: string, value: string,
-    update: (value: string) => void, password = false, disabled = false): void {
-    const row = new Setting(panel).setName(name).setDesc(help);
-    row.addText((text) => {
-      text.setValue(value).setDisabled(disabled);
-      if (password) { text.inputEl.type = "password"; text.inputEl.autocomplete = "new-password"; }
-      text.onChange((next) => { update(next); this.clearFieldError(field); });
-      this.fieldRows.set(field, { input: text.inputEl, row, help });
-    });
-  }
-
-  private clearFieldError(field: SettingsField): void {
-    const row = this.fieldRows.get(field);
-    if (row) row.row.setDesc(row.help);
-  }
-
-  private async applyActiveDraft(): Promise<SettingsApplyResult> {
-    const draft = this.currentDraft();
-    this.busy = true;
-    if (this.panel) { this.panel.inert = true; this.panel.setAttribute("aria-busy", "true"); }
-    let outcome: SettingsApplyResult;
-    try { outcome = await this.plugin.applyDraft(draft, this.activeSection); }
-    finally {
-      this.busy = false;
-      if (this.panel) { this.panel.inert = false; this.panel.removeAttribute("aria-busy"); }
-    }
-    if (outcome.kind === "validation-error") {
-      for (const [field, message] of Object.entries(outcome.errors) as Array<[SettingsField, string]>) {
-        const row = this.fieldRows.get(field);
-        if (row) row.row.setDesc(message);
-      }
-      const first = Object.keys(outcome.errors)[0] as SettingsField | undefined;
-      this.fieldRows.get(first!)?.input.focus();
-      return outcome;
-    }
-    if (outcome.kind === "persistence-error") {
-      new Notice(`Could not save settings: ${outcome.message}`);
-      return outcome;
-    }
-    if (outcome.kind === "connection-error") new Notice("Settings saved. Connection failed.");
-    else if (outcome.kind === "not-configured") new Notice("Settings saved. Sync is not configured.");
-    else new Notice("Settings saved.");
-    return outcome;
-  }
-
-  private addDraftActions(panel: HTMLElement): void {
-    const note = panel.createEl("p", { cls: "flash-sync-draft-note", text: "Changes stay here until applied. Closing settings discards unapplied changes." });
-    const actions = panel.createDiv({ cls: "flash-sync-actions" });
-    const apply = actions.createEl("button", { text: this.activeSection === "advanced" ? "Save changes" : "Save and reconnect",
-      attr: { type: "button" } });
-    if (this.activeSection !== "advanced") apply.classList.add("mod-cta");
-    apply.addEventListener("click", async () => {
-      apply.disabled = true;
-      try { await this.applyActiveDraft(); }
-      finally { apply.disabled = false; }
-    });
-    const discard = actions.createEl("button", { text: "Discard", attr: { type: "button" } });
-    discard.addEventListener("click", () => {
-      this.drafts.delete(this.activeSection);
-      this.renderSection();
-      note.textContent = "Draft discarded. Closing settings discards any unapplied changes.";
-    });
-  }
-
-  private renderConnection(panel: HTMLElement): void {
-    panel.createEl("h2", { text: "Connection" });
-    const draft = this.currentDraft();
-    this.addText(panel, "vaultId", "Vault ID", this.plugin.config.boundVaultId
-      ? "Locked after first successful connection to protect this vault identity."
-      : "Use the same ID on each device joining this vault.", draft.vaultId, (value) => { draft.vaultId = value.trim(); }, false, !!this.plugin.config.boundVaultId);
-    this.addText(panel, "server", "NATS WSS URL", "Secure WebSocket URL for your NATS server.", draft.server,
-      (value) => { draft.server = value.trim(); });
-    this.addText(panel, "username", "NATS username", "Per-vault account created by your server administrator.", draft.username,
-      (value) => { draft.username = value.trim(); });
-    const passwordSaved = Boolean(draft.passwordSecretKey && this.app.secretStorage.getSecret(draft.passwordSecretKey));
-    this.addText(panel, "hasPassword", "NATS password", passwordSaved
-      ? "Saved securely. Enter a replacement to change it; the replacement is saved when you apply."
-      : "Required. The password is saved in Obsidian SecretStorage when you apply.", "",
-      (value) => { draft.natsPassword = value; }, true);
-    this.addDraftActions(panel);
-  }
-
-  private renderAttachments(panel: HTMLElement): void {
-    panel.createEl("h2", { text: "Attachments" });
-    panel.createEl("p", { text: "Optional. Without S3, images and oversized files remain local while Markdown sync continues." });
-    const draft = this.currentDraft();
-    const toggle = panel.createEl("label", { cls: "flash-sync-checkbox" });
-    const checkbox = toggle.createEl("input", { attr: { type: "checkbox" } });
-    checkbox.checked = draft.attachmentsEnabled;
-    toggle.createSpan({ text: " Configure S3 attachment storage" });
-    const fields = panel.createDiv();
-    const renderFields = (): void => {
-      fields.empty(); this.fieldRows.clear();
-      if (!draft.attachmentsEnabled) return;
-      this.addText(fields, "s3Endpoint", "S3 HTTPS endpoint", "HTTPS endpoint for S3-compatible storage.", draft.s3Endpoint,
-        (value) => { draft.s3Endpoint = value.trim(); });
-      this.addText(fields, "s3Bucket", "Bucket", "Bucket for attachment and oversized-file objects.", draft.s3Bucket,
-        (value) => { draft.s3Bucket = value.trim(); });
-      this.addText(fields, "s3Region", "Region", "S3 signing region.", draft.s3Region,
-        (value) => { draft.s3Region = value.trim(); });
-      this.addText(fields, "s3AccessKeyId", "Access key ID", "Stored with this vault’s settings.", draft.s3AccessKeyId,
-        (value) => { draft.s3AccessKeyId = value.trim(); });
-      const saved = Boolean(draft.s3SecretKeySecretKey && this.app.secretStorage.getSecret(draft.s3SecretKeySecretKey));
-      this.addText(fields, "hasS3Secret", "Secret access key", saved
-        ? "Saved securely. Enter a replacement to change it; the replacement is saved when you apply."
-        : "Required. The secret key is saved in Obsidian SecretStorage when you apply.", "",
-        (value) => { draft.s3Secret = value; }, true);
-    };
-    checkbox.addEventListener("change", () => {
-      draft.attachmentsEnabled = checkbox.checked;
-      if (!checkbox.checked) {
-        Object.assign(draft, { s3Endpoint: "", s3Bucket: "", s3Region: "us-east-1", s3AccessKeyId: "", s3Secret: "" });
-      }
-      renderFields();
-    });
-    renderFields();
-    this.addDraftActions(panel);
-  }
-
-  private renderTransfer(panel: HTMLElement): void {
-    panel.createEl("h2", { text: "Device transfer" });
-    const mode = panel.createDiv({ cls: "flash-sync-transfer-modes" });
-    for (const [value, label] of [["import", "Import"], ["export", "Export"]] as const) {
-      const button = mode.createEl("button", { text: label, attr: { type: "button", "aria-pressed": String(value === this.transferMode) } });
-      button.addEventListener("click", () => { this.transferMode = value; this.renderSection(); });
-    }
-    if (this.transferMode === "import") {
-      panel.createEl("p", { text: "Preview settings before they are saved. Secrets stay hidden in the preview." });
-      new Setting(panel).addButton((button) => button.setButtonText("Paste transfer code").setCta().onClick(() => {
-        new ImportConfigModal(this.app, this.plugin, "").open();
-      }));
-    } else {
-      panel.createEl("p", { text: "Export includes the currently applied connection and optional attachment settings." });
-      new Setting(panel).addButton((button) => button.setButtonText("Create protected QR").setCta().onClick(() => {
-        new ExportConfigModal(this.app, this.plugin).open();
-      }));
-    }
-  }
-
-  private async saveAdvanced(update: Partial<Pick<EasySyncSettings, "inlineLimit" | "debugLogging" | "statusBarMode">>, row?: Setting, help?: string): Promise<SettingsApplyResult> {
-    const outcome = await this.plugin.applyAdvancedUpdate(update);
-    if (outcome.kind === "validation-error") {
-      const message = outcome.errors.inlineLimitKiB;
-      if (message && row) row.setDesc(message);
-      return outcome;
-    }
-    if (row && help) row.setDesc(help);
-    if (outcome.kind === "persistence-error") {
-      new Notice(`Could not save settings: ${outcome.message}`);
-      this.renderSection();
-    }
-    return outcome;
-  }
-
-  private renderAdvanced(panel: HTMLElement): void {
-    panel.createEl("h2", { text: "Advanced" });
-    const row = new Setting(panel).setName("Inline Markdown limit (KiB)")
-      .setDesc("Values above this size use S3. Changing this value reconnects sync.");
-    const inlineLimit = row.controlEl.createEl("input", { attr: { type: "number", min: "1", step: "1", "aria-label": "Inline Markdown limit in KiB" } });
-    inlineLimit.value = String(this.plugin.config.inlineLimit / 1024);
-    const commitInlineLimit = (): void => {
-      const value = inlineLimit.value.trim();
-      if (value === this.lastInlineLimitCommit) return;
-      this.lastInlineLimitCommit = value;
-      void this.saveAdvanced({ inlineLimit: Number(value) * 1024 }, row, "Values above this size use S3. Changing this value reconnects sync.")
-        .then((outcome) => { if ((outcome.kind === "validation-error" || outcome.kind === "persistence-error") && this.lastInlineLimitCommit === value) this.lastInlineLimitCommit = undefined; });
-    };
-    inlineLimit.addEventListener("change", commitInlineLimit);
-    inlineLimit.addEventListener("blur", commitInlineLimit);
-    const statusBarRow = new Setting(panel).setName("Status bar presentation")
-      .setDesc("Minimal shows an icon; Extended shows an icon and text.");
-    const modes = statusBarRow.controlEl.createDiv({ cls: "flash-sync-status-mode-options", attr: { role: "radiogroup", "aria-label": "Status bar presentation" } });
-    for (const mode of ["minimal", "extended"] as const) {
-      const option = modes.createEl("label");
-      const input = option.createEl("input", { attr: { type: "radio", name: "flash-sync-status-mode", value: mode } });
-      input.checked = this.plugin.config.statusBarMode === mode;
-      input.addEventListener("change", () => { if (input.checked) void this.saveAdvanced({ statusBarMode: mode }); });
-      option.createSpan({ text: mode === "minimal" ? "Minimal" : "Extended" });
-    }
-    const diagnostics = panel.createDiv({ cls: "flash-sync-advanced-footer" });
-    diagnostics.createEl("h3", { text: "Diagnostics" });
-    const debugRow = new Setting(diagnostics).setName("Debug logging")
-      .setDesc("Write connection, reconciliation, and pending-change events to the developer console. Errors are always recorded.");
-    debugRow.addToggle((toggle) => toggle.setValue(this.plugin.config.debugLogging).onChange((value) => {
-      void this.saveAdvanced({ debugLogging: value });
-    }));
-  }
-}

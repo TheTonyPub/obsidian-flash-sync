@@ -16,6 +16,18 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 const iterations = 250_000;
 const maxTransferLength = 4096;
 
+/** 32 symbols without the look-alikes 0/O and 1/I, so a phrase can be read aloud or retyped. */
+export const TRANSFER_PHRASE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+/** Returns four hyphenated groups of four symbols: 16 × 5 = 80 random bits. */
+export function generateTransferPhrase(
+  randomValues: (target: Uint8Array) => Uint8Array = (target) => crypto.getRandomValues(target),
+): string {
+  // 256 is a multiple of 32, so masking each byte keeps every symbol equally likely.
+  const symbols = Array.from(randomValues(new Uint8Array(16)), (byte) => TRANSFER_PHRASE_ALPHABET[byte & 31]).join("");
+  return symbols.match(/.{4}/g)!.join("-");
+}
+
 function base64url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);

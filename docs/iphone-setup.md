@@ -13,9 +13,9 @@ The plugin needs Obsidian 1.11.4 or newer. The build uses browser APIs and is ma
 
 ## Transfer settings
 
-1. On the Mac, open flash-sync settings and select **Show encrypted QR**.
-2. Enter a code phrase of at least 8 characters. The QR contains the vault ID, WSS address, NATS credentials, and optional S3 credentials encrypted with AES-GCM. Keep the phrase separate from the QR.
-3. Scan the QR with the iPhone Camera, open the Obsidian link, enter the phrase, and select **Connect**. The plugin decrypts and imports the settings before connecting.
-4. If the camera link does not reach the plugin, use **Copy transfer link** on the Mac and open it on the iPhone. You can also paste the encrypted code after `data=` into **Import settings → Paste transfer code**.
+1. On the Mac, open flash-sync settings. On **Sync**, under **Other devices**, select **Create QR code** next to **Send settings to a new device**. It is unavailable while the Mac cannot sign in, because a broken password would travel with the code.
+2. The plugin generates a code phrase of four hyphenated groups of four letters and digits. Keep it, or type your own of at least 8 characters. The QR contains the vault ID, WSS address, NATS credentials, and optional S3 credentials encrypted with AES-GCM; the phrase is never part of the QR or link. Keep the phrase separate from the QR.
+3. Scan the QR with the iPhone Camera, open the Obsidian link, enter the phrase, select **Preview settings**, then **Import and connect**. The plugin decrypts and imports the settings before connecting.
+4. If the camera link does not reach the plugin, use **Copy link** on the Mac and open it on the iPhone. You can also use **Copy code only** and paste the code on the iPhone with **Paste transfer code** on **Sync**.
 
 The iPhone keeps its own device ID. The QR and transfer link remain usable by anyone who also knows the phrase, so close the QR after use and do not post either item publicly. The server must provide a reachable NATS WSS endpoint, the vault's `OBS_<vaultId>_FILES` bucket, and matching vault credentials. S3 remains optional; without it, inline content syncs, while larger files do not.
