@@ -21,6 +21,8 @@ layout, hierarchy, copy and states. Where they differ, the spec wins.
 | `Advanced` | Inline limit, device ID, diagnostics |
 | `Mobile-Home`, `Mobile-Conflict`, `Mobile-Server`, `Mobile-Share`, `Mobile-Advanced` | Mobile equivalents |
 | `Dark-*` | Default Obsidian dark theme for Sync, Conflicts, Advanced and mobile Sync/Conflict |
+| `Diff-Desktop`, `Diff-Desktop-Dark` | Conflict compare view, side by side, highlighted line diff (`conflict-diff-view` change) |
+| `Diff-Mobile` | Conflict compare view on mobile, unified, grouped by nearest heading |
 
 ## Structure
 
@@ -38,6 +40,7 @@ layout, hierarchy, copy and states. Where they differ, the spec wins.
 - Status always has an icon and a text label, never only a colored dot.
 - Grouped rows sit in bordered cards with 10–12 px radius. Only one accent-filled primary action per view.
 - Mobile: one column, controls at least 44 px tall, labels above inputs, bottom-anchored actions, conflict choices in a sheet.
+- Compare view: whole-line highlights only (no word-level marks). Server-only lines use the red tint and `−`, device-only lines use the green tint and `+`. Missing counterparts are hatched, and unchanged runs collapse.
 
 ## Known deviations
 
