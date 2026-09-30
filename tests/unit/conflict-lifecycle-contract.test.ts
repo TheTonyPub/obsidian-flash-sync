@@ -352,6 +352,50 @@ describe("durable conflict lifecycle contracts", () => {
     await close(state);
   });
 
+  // A detected merge conflict leaves the remote text on the canonical path and the local text in the copy.
+  it("resolves a detected merge conflict whose canonical path holds the remote version", async () => {
+    for (const action of ["keepRemote", "keepLocalCopy"] as const) {
+      const kv = new NatsKvDouble();
+      const state = await replica(`detected-${action}`, kv, "REMOTE\n");
+      const fileId = (await state.store.getFileByPath("note.md"))!.fileId;
+      state.engine.stop();
+      kv.put(`f.${fileId}`, encodeRecord(remote(fileId, "note.md", "REMOTE\n")));
+      state.vault.write("note.conflict.md", bytes("LOCAL\n"));
+      await state.store.putConflict({
+        operationId: "detected-op", originalFileId: fileId, originalPath: "note.md", copyFileId: "copy",
+        copyPath: "note.conflict.md", remoteRevision: kv.get(`f.${fileId}`)!.revision, lifecycle: "unresolved",
+        context: "merge", canonicalPath: "note.md", remotePath: "note.md",
+        detectionRemoteHash: sha256Hex(bytes("REMOTE\n")), detectionLocalHash: sha256Hex(bytes("LOCAL\n")),
+        detectionCopyHash: sha256Hex(bytes("LOCAL\n")),
+      } as unknown as ConflictRecord);
+      await (state.engine as ResolutionEngine)[action]("detected-op");
+      await state.engine.settle();
+      expect(text(state.vault, "note.md")).toBe(action === "keepRemote" ? "REMOTE\n" : "LOCAL\n");
+      expect((await state.store.getConflict("detected-op") as LifecycleRecord).lifecycle).toBe("resolved");
+      await close(state);
+    }
+  });
+
+  it("still blocks a detected merge conflict when the canonical path was edited afterwards", async () => {
+    const kv = new NatsKvDouble();
+    const state = await replica("detected-edited", kv, "REMOTE\n");
+    const fileId = (await state.store.getFileByPath("note.md"))!.fileId;
+    state.engine.stop();
+    kv.put(`f.${fileId}`, encodeRecord(remote(fileId, "note.md", "REMOTE\n")));
+    state.vault.write("note.conflict.md", bytes("LOCAL\n"));
+    await state.store.putConflict({
+      operationId: "detected-edit-op", originalFileId: fileId, originalPath: "note.md", copyFileId: "copy",
+      copyPath: "note.conflict.md", remoteRevision: kv.get(`f.${fileId}`)!.revision, lifecycle: "unresolved",
+      context: "merge", canonicalPath: "note.md", remotePath: "note.md",
+      detectionRemoteHash: sha256Hex(bytes("REMOTE\n")), detectionLocalHash: sha256Hex(bytes("LOCAL\n")),
+      detectionCopyHash: sha256Hex(bytes("LOCAL\n")),
+    } as unknown as ConflictRecord);
+    state.vault.write("note.md", bytes("EDITED BY HAND\n"));
+    await expect((state.engine as ResolutionEngine).keepRemote("detected-edit-op")).rejects.toThrow("Canonical path changed");
+    expect(text(state.vault, "note.md")).toBe("EDITED BY HAND\n");
+    await close(state);
+  });
+
   it("keeps manual edit and delete unresolved until their queued remote mutations are confirmed", async () => {
     for (const deleted of [false, true]) {
       const kv = new NatsKvDouble();
