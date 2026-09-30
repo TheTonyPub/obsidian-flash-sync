@@ -332,7 +332,11 @@ export class MarkdownSyncEngine {
     const canonical = await this.options.vault.read(path);
     if (record.remoteRevision !== undefined && head.revision !== record.remoteRevision) throw new Error("Remote changed; refresh conflict review");
     if (record.detectionRemoteHash && remote.contentHash !== record.detectionRemoteHash) throw new Error("Remote content changed; refresh conflict review");
-    const canonicalChanged = record.context === "path-collision"
+    // A detected merge conflict moves the local text into the copy and leaves the remote version
+    // on the canonical path, so the copy hash equals the local hash.
+    const canonicalHoldsRemote = record.context === "path-collision" ||
+      (record.context === "merge" && !!record.detectionLocalHash && record.detectionCopyHash === record.detectionLocalHash);
+    const canonicalChanged = canonicalHoldsRemote
       ? (remote.deleted ? !!canonical : !canonical || sha256Hex(canonical) !== remote.contentHash)
       : !!record.detectionLocalHash && (!canonical || sha256Hex(canonical) !== record.detectionLocalHash);
     if (canonicalChanged) {
