@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flash-sync · Compare conflict, dark</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#dadada;background:#1e1e1e}
+button{font-family:inherit;cursor:pointer}
+a{color:#b7a3fb}a:hover{color:#d2c6fd}
+</style>
+</helmet>
+<div style="width: 1200px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #1e1e1e; font-size: 14px; color: #dadada; overflow: hidden">
+  <div style="height: 38px; flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px; padding: 0 14px; border-bottom: 1px solid #363636; background: #262626">
+    <div style="display: flex; align-items: center; gap: 8px; height: 38px">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #febc2e"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #28c840"></span>
+    </div>
+    <div style="margin-left: 60px; display: flex; gap: 2px">
+      <div style="height: 30px; padding: 0 14px; display: flex; align-items: center; font-size: 13px; color: #a3a3a3">Weekly plan.md</div>
+      <div style="height: 30px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 8px 8px 0 0; background: #1e1e1e; border: 1px solid #363636; border-bottom: 0; font-size: 13px; font-weight: 600; color: #f0f0f0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f2bd5a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M9 10h6"></path><path d="M12 13V7"></path><path d="M9 17h6"></path></svg>
+        Compare · Weekly plan.md
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid #363636">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: #f0f0f0">Weekly plan.md</h1>
+        <span style="padding: 2px 8px; border-radius: 999px; background: #3a2e16; color: #f2bd5a; font-size: 12px; font-weight: 600">Needs decision</span>
+      </div>
+      <div style="font-size: 13px; color: #a3a3a3">Projects/2026 · 3 changes · <span style="color: #ff8b8f; font-weight: 600">4 lines only on server</span> · <span style="color: #6bd497; font-weight: 600">5 lines only on this device</span></div>
+    </div>
+    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c8c8c8">
+      <input type="checkbox" checked style="width: 15px; height: 15px; accent-color: #7a55ee">
+      Changes only
+    </label>
+    <div role="radiogroup" aria-label="Layout" style="display: flex; padding: 3px; border-radius: 9px; background: #2c2c2c">
+      <button type="button" role="radio" aria-checked="true" style="height: 28px; padding: 0 12px; border: 0; border-radius: 7px; font-size: 13px; background: #454545; color: #f0f0f0; font-weight: 600">Side by side</button>
+      <button type="button" role="radio" aria-checked="false" style="height: 28px; padding: 0 12px; border: 0; border-radius: 7px; font-size: 13px; background: transparent; color: #a3a3a3">Unified</button>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden">
+    <div style="flex-shrink: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid #363636; background: #1b1b1b">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-right: 1px solid #363636">
+        <span style="width: 8px; height: 8px; border-radius: 2px; background: #ff6b70"></span>
+        <span style="font-weight: 600; color: #f0f0f0">Server version</span>
+        <span style="font-size: 12px; color: #a3a3a3">rev 418 · 2.4 KB · edited on another device</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 24px">
+        <span style="width: 8px; height: 8px; border-radius: 2px; background: #36c46f"></span>
+        <span style="font-weight: 600; color: #f0f0f0">This device</span>
+        <span style="font-size: 12px; color: #a3a3a3">conflict copy · 2.6 KB</span>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 22px">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))">
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">1</span><span style="width: 18px; flex-shrink: 0"></span><span># Weekly plan</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">1</span><span style="width: 18px; flex-shrink: 0"></span><span># Weekly plan</span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">2</span><span style="width: 18px"></span><span></span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">2</span><span style="width: 18px"></span><span></span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">3</span><span style="width: 18px"></span><span>## Monday</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">3</span><span style="width: 18px"></span><span>## Monday</span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">4</span><span style="width: 18px"></span><span>- Review sync PR</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">4</span><span style="width: 18px"></span><span>- Review sync PR</span></div>
+
+        <div style="display: flex; background: #3a1f22; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #ff8b8f">5</span><span style="width: 18px; flex-shrink: 0; color: #ff8b8f; font-weight: 700">−</span><span>- Call with the design team at 15:00</span></div>
+        <div style="display: flex; background: #1c3326"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #6bd497">5</span><span style="width: 18px; flex-shrink: 0; color: #6bd497; font-weight: 700">+</span><span>- Call with the design team at 16:30</span></div>
+
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">6</span><span style="width: 18px"></span><span>- Buy groceries</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">6</span><span style="width: 18px"></span><span>- Buy groceries</span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">7</span><span style="width: 18px"></span><span></span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">7</span><span style="width: 18px"></span><span></span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">8</span><span style="width: 18px"></span><span>## Tuesday</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">8</span><span style="width: 18px"></span><span>## Tuesday</span></div>
+
+        <div style="display: flex; background: #3a1f22; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #ff8b8f">9</span><span style="width: 18px; flex-shrink: 0; color: #ff8b8f; font-weight: 700">−</span><span>- Draft Q4 roadmap</span></div>
+        <div style="display: flex; background: #1c3326"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #6bd497">9</span><span style="width: 18px; flex-shrink: 0; color: #6bd497; font-weight: 700">+</span><span>- Draft Q4 roadmap and budget</span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">10</span><span style="width: 18px"></span><span>- Gym</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">10</span><span style="width: 18px"></span><span>- Gym</span></div>
+        <div style="display: flex; background: repeating-linear-gradient(135deg, #242424 0 6px, #1e1e1e 6px 12px); border-right: 1px solid #363636"><span style="width: 44px"></span></div>
+        <div style="display: flex; background: #1c3326"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #6bd497">11</span><span style="width: 18px; flex-shrink: 0; color: #6bd497; font-weight: 700">+</span><span>- Book the dentist</span></div>
+      </div>
+
+      <button type="button" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 34px; border: 0; border-top: 1px solid #303030; border-bottom: 1px solid #303030; background: #252525; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #b7a3fb">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"></path><path d="m7 9 5-5 5 5"></path></svg>
+        Show 24 unchanged lines
+      </button>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))">
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">35</span><span style="width: 18px"></span><span>## Notes</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">36</span><span style="width: 18px"></span><span>## Notes</span></div>
+        <div style="display: flex; background: #3a1f22; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #ff8b8f">36</span><span style="width: 18px; flex-shrink: 0; color: #ff8b8f; font-weight: 700">−</span><span>- Renew the domain before Friday</span></div>
+        <div style="display: flex; background: repeating-linear-gradient(135deg, #242424 0 6px, #1e1e1e 6px 12px)"><span style="width: 44px"></span></div>
+        <div style="display: flex; border-right: 1px solid #363636"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">37</span><span style="width: 18px"></span><span>- Ideas go to Ideas.md</span></div>
+        <div style="display: flex"><span style="width: 44px; flex-shrink: 0; padding-right: 10px; text-align: right; color: #7a7a7a">37</span><span style="width: 18px"></span><span>- Ideas go to Ideas.md</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-top: 1px solid #363636; background: #222222">
+    <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1">
+      <span style="font-weight: 600; color: #f0f0f0">Which version should the note keep?</span>
+      <span style="font-size: 12px; color: #a3a3a3">The other version stays as a recoverable backup.</span>
+    </div>
+    <button type="button" style="height: 34px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-size: 13px; color: #a3a3a3">More…</button>
+    <button type="button" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid #5c2a2e; border-radius: 8px; background: #2c1d1f; font-size: 13px; font-weight: 600; color: #f0f0f0">
+      <span style="width: 8px; height: 8px; border-radius: 2px; background: #ff6b70"></span>
+      Keep server version
+    </button>
+    <button type="button" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border: 1px solid #28553a; border-radius: 8px; background: #1a2a20; font-size: 13px; font-weight: 600; color: #f0f0f0">
+      <span style="width: 8px; height: 8px; border-radius: 2px; background: #36c46f"></span>
+      Keep my version
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

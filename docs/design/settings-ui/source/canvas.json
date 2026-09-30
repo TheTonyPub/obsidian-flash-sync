@@ -2,31 +2,208 @@
   "v": 3,
   "attachments": {},
   "boards": {
-    "Add-Device.dc.html": {"h": 900, "radius": 12, "title": "Desktop · Send settings to a new device", "w": 1200, "x": 1280, "y": 1020},
-    "Home-Conflicts.dc.html": {"h": 900, "radius": 12, "title": "Desktop · Sync, 2 conflicts", "w": 1200, "x": 1280, "y": 0},
-    "Home-Error.dc.html": {"h": 900, "radius": 12, "title": "Desktop · Sync, sign-in failed", "w": 1200, "x": 2560, "y": 0},
-    "Main.dc.html": {"h": 900, "is_interactive": true, "radius": 12, "title": "Desktop · Sync (home), synchronized", "w": 1200, "x": 0, "y": 0},
-    "Mobile-Conflict.dc.html": {"h": 844, "radius": 24, "title": "Mobile · Resolve a conflict", "w": 390, "x": 470, "y": 2240},
-    "Mobile-Home.dc.html": {"h": 844, "radius": 24, "title": "Mobile · Sync", "w": 390, "x": 0, "y": 2240},
-    "Mobile-Server.dc.html": {"h": 844, "radius": 24, "title": "Mobile · Server", "w": 390, "x": 940, "y": 2240},
-    "Mobile-Share.dc.html": {"h": 844, "radius": 24, "title": "Mobile · Send settings", "w": 390, "x": 1410, "y": 2240},
-    "Server.dc.html": {"h": 900, "radius": 12, "title": "Desktop · Server (connection + attachments)", "w": 1200, "x": 0, "y": 1020},
-    "Setup.dc.html": {"h": 900, "radius": 12, "title": "Desktop · First run, not configured", "w": 1200, "x": 2560, "y": 1020},
-    "Advanced.dc.html": {"h": 900, "radius": 12, "title": "Desktop · Advanced", "w": 1200, "x": 3840, "y": 1020},
-    "Mobile-Advanced.dc.html": {"h": 844, "radius": 24, "title": "Mobile · Advanced", "w": 390, "x": 1880, "y": 2240},
-    "Dark-Main.dc.html": {"h": 900, "radius": 12, "title": "Dark · Desktop · Sync", "w": 1200, "x": 0, "y": 3500},
-    "Dark-Conflicts.dc.html": {"h": 900, "radius": 12, "title": "Dark · Desktop · Conflicts", "w": 1200, "x": 1280, "y": 3500},
-    "Dark-Advanced.dc.html": {"h": 900, "radius": 12, "title": "Dark · Desktop · Advanced", "w": 1200, "x": 2560, "y": 3500},
-    "Dark-Mobile-Home.dc.html": {"h": 844, "radius": 24, "title": "Dark · Mobile · Sync", "w": 390, "x": 0, "y": 4520},
-    "Dark-Mobile-Conflict.dc.html": {"h": 844, "radius": 24, "title": "Dark · Mobile · Resolve a conflict", "w": 390, "x": 470, "y": 4520}
+    "Add-Device.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Send settings to a new device",
+      "w": 1200,
+      "x": 1280,
+      "y": 1020
+    },
+    "Advanced.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Advanced",
+      "w": 1200,
+      "x": 3840,
+      "y": 1020
+    },
+    "Dark-Advanced.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Dark · Desktop · Advanced",
+      "w": 1200,
+      "x": 2560,
+      "y": 3500
+    },
+    "Dark-Conflicts.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Dark · Desktop · Conflicts",
+      "w": 1200,
+      "x": 1280,
+      "y": 3500
+    },
+    "Dark-Main.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Dark · Desktop · Sync",
+      "w": 1200,
+      "x": 0,
+      "y": 3500
+    },
+    "Dark-Mobile-Conflict.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Dark · Mobile · Resolve a conflict",
+      "w": 390,
+      "x": 470,
+      "y": 4520
+    },
+    "Dark-Mobile-Home.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Dark · Mobile · Sync",
+      "w": 390,
+      "x": 0,
+      "y": 4520
+    },
+    "Home-Conflicts.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Sync, 2 conflicts",
+      "w": 1200,
+      "x": 1280,
+      "y": 0
+    },
+    "Home-Error.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Sync, sign-in failed",
+      "w": 1200,
+      "x": 2560,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "h": 900,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "Desktop · Sync (home), synchronized",
+      "w": 1200,
+      "x": 0,
+      "y": 0
+    },
+    "Mobile-Advanced.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Advanced",
+      "w": 390,
+      "x": 1880,
+      "y": 2240
+    },
+    "Mobile-Conflict.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Resolve a conflict",
+      "w": 390,
+      "x": 470,
+      "y": 2240
+    },
+    "Mobile-Home.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Sync",
+      "w": 390,
+      "x": 0,
+      "y": 2240
+    },
+    "Mobile-Server.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Server",
+      "w": 390,
+      "x": 940,
+      "y": 2240
+    },
+    "Mobile-Share.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Send settings",
+      "w": 390,
+      "x": 1410,
+      "y": 2240
+    },
+    "Server.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Server (connection + attachments)",
+      "w": 1200,
+      "x": 0,
+      "y": 1020
+    },
+    "Setup.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · First run, not configured",
+      "w": 1200,
+      "x": 2560,
+      "y": 1020
+    },
+    "Diff-Desktop.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Desktop · Compare conflict (side by side)",
+      "w": 1200,
+      "x": 0,
+      "y": 5700
+    },
+    "Diff-Desktop-Dark.dc.html": {
+      "h": 900,
+      "radius": 12,
+      "title": "Dark · Desktop · Compare conflict",
+      "w": 1200,
+      "x": 1280,
+      "y": 5700
+    },
+    "Diff-Mobile.dc.html": {
+      "h": 844,
+      "radius": 24,
+      "title": "Mobile · Compare conflict (unified)",
+      "w": 390,
+      "x": 2560,
+      "y": 5700
+    }
   },
-  "createdOnFiles": {"at": "2026-09-30T12:00:00Z", "v": 1},
+  "createdOnFiles": {
+    "at": "2026-09-30T12:00:00Z",
+    "v": 1
+  },
   "designSystems": [],
-  "launch": {"view": "canvas"},
+  "launch": {
+    "view": "canvas"
+  },
   "notes": {
-    "desktop": {"kind": "title1", "maxW": 5040, "text": "Desktop — three tabs: Sync · Server · Advanced", "w": 240, "x": 0, "y": -300},
-    "mobile": {"kind": "title1", "maxW": 2270, "text": "Mobile — same three tabs, one column, sticky actions", "w": 240, "x": 0, "y": 1940},
-    "dark": {"kind": "title1", "maxW": 3760, "text": "Dark theme — Obsidian default dark", "x": 0, "y": 3200}
+    "dark": {
+      "kind": "title1",
+      "maxW": 3760,
+      "text": "Dark theme — Obsidian default dark",
+      "w": 240,
+      "x": 0,
+      "y": 3200
+    },
+    "desktop": {
+      "kind": "title1",
+      "maxW": 5040,
+      "text": "Desktop — three tabs: Sync · Server · Advanced",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "mobile": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "Mobile — same three tabs, one column, sticky actions",
+      "w": 240,
+      "x": 0,
+      "y": 1940
+    },
+    "diff": {
+      "kind": "title1",
+      "maxW": 2950,
+      "text": "Conflict compare view — highlighted line diff",
+      "x": 0,
+      "y": 5400
+    }
   },
   "order": [
     "Main.dc.html",
@@ -45,7 +222,10 @@
     "Dark-Conflicts.dc.html",
     "Dark-Advanced.dc.html",
     "Dark-Mobile-Home.dc.html",
-    "Dark-Mobile-Conflict.dc.html"
+    "Dark-Mobile-Conflict.dc.html",
+    "Diff-Desktop.dc.html",
+    "Diff-Desktop-Dark.dc.html",
+    "Diff-Mobile.dc.html"
   ],
   "pages": [],
   "title": "flash-sync settings redesign"

@@ -1,3 +1,5 @@
+> Approved: 2026-09-30 by the owner.
+
 ## Why
 
 Settings spread status, conflicts, connection, attachments and transfer over five tabs, so checking state, resolving a conflict or moving settings to another device takes several steps. Mobile needs a separate section picker and long single-row fields. The approved design in `docs/design/settings-ui/` regroups the same functions around the next action.
