@@ -37,10 +37,14 @@ export function createTerminalPrompts(
   policy: ReturnType<typeof terminalPolicy>,
 ): CliPrompts {
   const identity = (value: string): string => value;
+  // Inquirer colors defaults through yoctocolors whenever the process supports color (for example in CI),
+  // so a colorless theme must override every styled slot, including the select key-help line and spinner.
   const theme = policy.color ? undefined : {
     prefix: { idle: "?", done: "✓" },
+    spinner: { interval: 80, frames: ["-", "\\", "|", "/"] },
     style: { answer: identity, message: identity, error: identity, help: identity,
-      highlight: identity, description: identity, disabled: identity, key: identity, defaultAnswer: identity },
+      highlight: identity, description: identity, disabled: identity, key: identity, defaultAnswer: identity,
+      keysHelpTip: (keys: [string, string][]) => keys.map(([key, action]) => `${key} ${action}`).join(" • ") },
   };
   const context = { input, output };
   const run = async <T>(operation: () => Promise<T>): Promise<T> => {
