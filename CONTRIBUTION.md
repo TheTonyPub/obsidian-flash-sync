@@ -18,14 +18,14 @@ The CLI build also generates its administrator worker. `npm run test:server-cli-
 
 ## Branches and PRs
 
-- `dev` receives feature and ordinary bug-fix PRs. Start a short-lived `codex/<topic>` branch from current `origin/dev`.
+- `dev` receives feature and ordinary bug-fix PRs. Start a short-lived topic branch from current `origin/dev`.
 - `release/x.y.z` freezes a selected candidate for stabilization. Branch candidate fixes from it and target their PRs back to that release branch. New features continue into `dev`.
 - `master` contains accepted stable source. Stable tags must point to the exact tested candidate commit reachable from `master`.
 - Merge release fixes back into `dev` before retiring a release branch. Never move an existing release tag to another commit.
 
 ```sh
 git fetch origin
-git switch -c codex/my-change origin/dev
+git switch -c my-change origin/dev
 ```
 
 Keep PRs scoped. For behavioral changes, write a requirement-derived failing test, make the smallest correct change, then run focused checks. Include executed verification and any unverified behavior in the PR description. Update relevant docs and OpenSpec deltas together with behavior. Do not claim a local check proves a deployed server or live GitHub release.

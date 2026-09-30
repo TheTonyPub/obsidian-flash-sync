@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flash-sync · Send settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#222222;background:#ffffff}
+button,input{font-family:inherit}
+button{cursor:pointer}
+a{color:#5b36d6}a:hover{color:#4323b0}
+</style>
+</helmet>
+<div style="width: 1200px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #ffffff; font-size: 14px; color: #222222; overflow: hidden; position: relative">
+  <div style="height: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid #e3e3e3; background: #f6f6f6">
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #ff5f57"></span>
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #febc2e"></span>
+    <span style="width: 12px; height: 12px; border-radius: 50%; background: #28c840"></span>
+    <span style="flex-grow: 1; text-align: center; font-size: 13px; font-weight: 600; color: #5c5c5c; margin-right: 52px">Settings — test — Obsidian</span>
+  </div>
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+    <nav style="width: 250px; flex-shrink: 0; background: #f6f6f6; border-right: 1px solid #e3e3e3"></nav>
+    <main style="flex-grow: 1; box-sizing: border-box; padding: 26px 44px; display: flex; flex-direction: column; gap: 22px">
+      <h1 style="margin: 0; font-size: 20px; font-weight: 700">flash-sync</h1>
+      <div style="height: 40px; border-bottom: 1px solid #e3e3e3"></div>
+      <div style="height: 150px; border: 1px solid #e3e3e3; border-radius: 12px"></div>
+      <div style="height: 90px; border-radius: 10px; background: #f7f7f7"></div>
+      <div style="height: 150px; border: 1px solid #e3e3e3; border-radius: 10px"></div>
+    </main>
+  </div>
+
+  <div style="position: absolute; left: 0; top: 38px; right: 0; bottom: 0; background: rgba(20,20,20,0.38); display: flex; align-items: center; justify-content: center">
+    <div role="dialog" aria-modal="true" aria-labelledby="send-title" style="width: 660px; box-sizing: border-box; border-radius: 14px; background: #ffffff; box-shadow: 0 20px 60px rgba(0,0,0,0.25); display: flex; flex-direction: column">
+      <div style="display: flex; align-items: flex-start; gap: 16px; padding: 22px 24px 6px">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px">
+          <h2 id="send-title" style="margin: 0; font-size: 20px; font-weight: 700">Send settings to a new device</h2>
+          <div style="font-size: 13px; color: #5c5c5c">The new device needs two things: the code below and the phrase. Share them separately.</div>
+        </div>
+        <button type="button" aria-label="Close" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #5c5c5c; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+        </button>
+      </div>
+
+      <div style="padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600">
+          <span style="width: 20px; height: 20px; border-radius: 50%; background: #7852ee; color: #ffffff; font-size: 12px; display: flex; align-items: center; justify-content: center">1</span>
+          <label for="phrase">Code phrase</label>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <input id="phrase" value="maple-orbit-seven-quartz" style="flex-grow: 1; box-sizing: border-box; height: 38px; padding: 0 12px; border: 1px solid #dcdcdc; border-radius: 8px; font-size: 15px; letter-spacing: 0.02em; color: #222222; font-family: ui-monospace, SFMono-Regular, Menlo, monospace">
+          <button type="button" style="display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            New phrase
+          </button>
+        </div>
+        <div style="font-size: 12px; color: #5c5c5c">Generated for you — or type your own, 8+ characters. It is never stored in the code or link.</div>
+      </div>
+
+      <div style="padding: 8px 24px 20px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600">
+          <span style="width: 20px; height: 20px; border-radius: 50%; background: #7852ee; color: #ffffff; font-size: 12px; display: flex; align-items: center; justify-content: center">2</span>
+          Scan or send the link
+        </div>
+        <div style="display: flex; gap: 20px; align-items: stretch">
+          <div role="img" aria-label="QR code with the protected transfer link" style="flex-shrink: 0; padding: 10px; border: 1px solid #e3e3e3; border-radius: 10px; background: #ffffff">
+            <div style="display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); width: 175px; height: 175px">
+              <sc-for list="{{cells}}" as="c" hint-placeholder-count="625">
+                <sc-if value="{{c.on}}" hint-placeholder-val="{{false}}"><span style="display: block; background: #141414"></span></sc-if>
+                <sc-if value="{{c.off}}" hint-placeholder-val="{{true}}"><span style="display: block; background: #ffffff"></span></sc-if>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #3a3a3a">
+              <div><span style="font-weight: 600">Phone:</span> scan with the Camera app. Obsidian opens and asks for the phrase.</div>
+              <div><span style="font-weight: 600">Computer:</span> copy the link and open it there, or paste the code in flash-sync.</div>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <button type="button" style="display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: #7852ee; font-size: 13px; font-weight: 600; color: #ffffff">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                Copy link
+              </button>
+              <button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222">Copy code only</button>
+            </div>
+            <div style="margin-top: auto; padding: 10px 12px; border-radius: 8px; background: #f7f7f7; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #3a3a3a">
+              <div style="font-weight: 600; color: #5c5c5c">Includes</div>
+              <div style="display: flex; align-items: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#087a3a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Vault VAULT_A, server address and username</div>
+              <div style="display: flex; align-items: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#087a3a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Password, encrypted with the phrase</div>
+              <div style="display: flex; align-items: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#087a3a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Attachment storage (S3) and its keys</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid #ececec">
+        <button type="button" style="padding: 0; border: 0; background: transparent; font-size: 12px; color: #5c5c5c; text-decoration: underline">Create without a phrase…</button>
+        <span style="flex-grow: 1"></span>
+        <a href="Main.dc.html" style="display: flex; align-items: center; height: 34px; padding: 0 18px; border: 1px solid #dcdcdc; border-radius: 8px; background: #ffffff; font-size: 13px; color: #222222; text-decoration: none">Done</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const n = 25;
+    let seed = 20260930;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const corners = [[0, 0], [0, n - 7], [n - 7, 0]];
+    const cells = [];
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        let on = null;
+        for (const [or, oc] of corners) {
+          const dr = r - or, dc = c - oc;
+          if (dr >= -1 && dr <= 7 && dc >= -1 && dc <= 7) {
+            if (dr < 0 || dr > 6 || dc < 0 || dc > 6) on = false;
+            else on = dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4);
+          }
+        }
+        if (on === null && (r === 6 || c === 6)) on = (r + c) % 2 === 0;
+        if (on === null && r >= 16 && r <= 20 && c >= 16 && c <= 20) {
+          const dr = r - 18, dc = c - 18;
+          on = Math.max(Math.abs(dr), Math.abs(dc)) !== 1;
+        }
+        if (on === null) on = rnd() > 0.52;
+        cells.push({ on, off: !on });
+      }
+    }
+    return { cells };
+  }
+}
+</script>
+</body>
+</html>
