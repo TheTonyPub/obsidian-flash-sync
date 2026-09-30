@@ -1,6 +1,6 @@
-# easy-sync diagnostics
+# flash-sync diagnostics
 
-Open **Settings → easy-sync**. The **Last error** field shows the latest failure, including its underlying cause. The plugin writes errors to the Obsidian developer console with the `[flash-sync]` prefix even when debug logging is off.
+Open **Settings → Community plugins → flash-sync**. The **Last error** field shows the latest failure, including its underlying cause. The plugin writes errors to the Obsidian developer console with the `[flash-sync]` prefix even when debug logging is off.
 
 Turn on **Debug logging** in the same settings panel to see connection, reconciliation, and outbox events. Open Obsidian's developer tools and filter the console by `[flash-sync]`. Turn the switch off after collecting the needed events. A rebuild or restart is not required to change the log level.
 

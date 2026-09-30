@@ -1,4 +1,4 @@
-# NATS setup for flash-osidian-sync
+# NATS setup for flash-sync
 
 This guide covers two supported paths:
 
@@ -74,7 +74,7 @@ Confirm the domain DNS record resolves to the server and that every device accep
 
 ## Plugin configuration and optional S3
 
-In **Settings → Community plugins → flash-osidian-sync**, enter the provisioned Vault ID, `wss://` endpoint, vault username, and vault password, or open the vault-only URI from `fos`. The plugin opens only `OBS_<vaultId>_FILES` and saves imported NATS passwords and optional S3 secrets in Obsidian SecretStorage rather than ordinary plugin settings.
+In **Settings → Community plugins → flash-sync**, enter the provisioned Vault ID, `wss://` endpoint, vault username, and vault password, or open the vault-only URI from `fos`. The plugin opens only `OBS_<vaultId>_FILES` and saves imported NATS passwords and optional S3 secrets in Obsidian SecretStorage rather than ordinary plugin settings.
 
 The URI and QR contain a vault password. An empty optional phrase creates plaintext version 2; a phrase of at least eight characters creates encrypted version 1, which the plugin requests during import. Keep QR/link sharing private and the phrase separate. Administrator credentials must never be imported into Obsidian.
 
