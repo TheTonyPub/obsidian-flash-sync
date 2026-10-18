@@ -187,7 +187,8 @@ export class SyncSection {
     if (attachmentFailed(status)) {
       button(attachments, "Check attachment settings", { cls: "flash-sync-link", onClick: () => this.ctx.openSection("server") });
     }
-    fact("Waiting to upload", queueFact(status), false);
+    const queue = fact("Waiting to upload", queueFact(status), false);
+    if (status.held) button(queue, "Review sync scope", { cls: "flash-sync-link", onClick: () => this.ctx.openSection("advanced") });
 
     const message = status.connectionError || status.attachmentError || status.lastError;
     if (message) {

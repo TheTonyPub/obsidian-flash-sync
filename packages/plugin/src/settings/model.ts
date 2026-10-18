@@ -1,6 +1,7 @@
 import type { SyncStatus } from "../connection.js";
 import type { TransferConfig } from "../config-transfer.js";
 import type { ConflictHistoryEntry, ConflictRecord } from "../local-store.js";
+import type { ScopeMode } from "../sync-scope.js";
 import { validateSettingsDraft, type SettingsValidationErrors } from "../settings-validation.js";
 
 export interface EasySyncSettings {
@@ -18,6 +19,9 @@ export interface EasySyncSettings {
   inlineLimit: number;
   debugLogging: boolean;
   statusBarMode: "minimal" | "extended";
+  scopeMode: ScopeMode;
+  scopePatterns: string;
+  skipJunk: boolean;
 }
 
 export type SettingsSection = "sync" | "server" | "advanced";
@@ -97,6 +101,8 @@ export function validateDraft(draft: SettingsDraft, passwordAvailable: boolean, 
   }, requireConnection);
 }
 
+export type ScopeUpdate = Partial<Pick<EasySyncSettings, "scopeMode" | "scopePatterns" | "skipJunk">>;
+
 export type AdvancedUpdate = Partial<Pick<EasySyncSettings, "inlineLimit" | "debugLogging" | "statusBarMode">>;
 
 /** The narrow plugin surface the settings UI depends on. */
@@ -106,6 +112,10 @@ export interface SettingsHost {
   safeDiagnostic(error: unknown, additionalSecrets?: string[]): string;
   applyDraft(draft: SettingsDraft | ((settings: EasySyncSettings) => SettingsDraft), section: SettingsSection | "all"): Promise<SettingsApplyResult>;
   applyAdvancedUpdate(update: AdvancedUpdate): Promise<SettingsApplyResult>;
+  /** Save the sync scope and re-apply it live without reconnecting. */
+  applyScopeUpdate(update: ScopeUpdate): Promise<SettingsApplyResult>;
+  /** Count vault files inside and outside a candidate scope. */
+  previewScope(scope: ScopeUpdate): { inScope: number; outScope: number; outSamples: string[] };
   connectNow(): Promise<SettingsApplyResult>;
   /** Reconcile now when connected, otherwise start a connection attempt. */
   syncNow(): Promise<void>;

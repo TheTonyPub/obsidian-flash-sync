@@ -968,3 +968,17 @@ body.is-mobile .modal.flash-sync-sheet {
 .flash-sync-sheet .flash-sync-conflict-footer { flex-direction: column; align-items: stretch; }
 .flash-sync-sheet .flash-sync-conflict-footer button { width: 100%; }
 .flash-sync-sheet .flash-sync-manual { justify-content: space-between; margin-left: 0; }
+
+/* Sync scope */
+.flash-sync-settings .flash-sync-scope-patterns {
+  width: 100%;
+  min-height: 8em;
+  resize: vertical;
+}
+.flash-sync-scope-preview,
+.flash-sync-scope-warning {
+  padding: var(--size-4-2) 0 0;
+}
+.flash-sync-scope-warning:empty {
+  display: none;
+}

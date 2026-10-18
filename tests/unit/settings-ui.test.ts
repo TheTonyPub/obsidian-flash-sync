@@ -277,6 +277,7 @@ async function createPlugin() {
     workspace: { onLayoutReady: () => {}, getActiveViewOfType: () => null, openLinkText: vi.fn() },
     vault: {
       adapter: { exists: async () => false, read: async () => "" }, configDir: ".obsidian",
+      getFiles: () => [{ path: "notes/a.md" }, { path: "code/app.md" }],
       getAbstractFileByPath: (path: string) => vaultEntries.has(path) ? {} : undefined,
       createFolder: vi.fn(async (path: string) => { vaultEntries.set(path, ""); }),
       create: vi.fn(async (path: string, content: string) => {
@@ -1124,6 +1125,48 @@ describe("Advanced section", () => {
     expect(report).not.toContain("hidden");
     expect(report).not.toContain("user-test-a");
     await vi.waitFor(() => expect(ui.notices.at(-1)).toBe("Status report copied"));
+  });
+
+  it("edits the sync scope with a live preview and applies it without reconnecting", async () => {
+    stubClipboard();
+    const { plugin, tab } = await createConfiguredPlugin();
+    const panel = openAdvanced(tab);
+    const applyDraft = vi.spyOn(plugin, "applyDraft");
+    const area = descendants(findSetting(panel, "Patterns")).find((element) => element.getAttribute("aria-label") === "Sync scope patterns")!;
+    const preview = () => byClass(openAdvanced(tab), "flash-sync-scope-preview").textContent;
+    expect(preview()).toContain("0 of 2 files outside the scope");
+
+    area.value = "code/";
+    area.dispatch("input");
+    expect(byClass(panel, "flash-sync-scope-preview").textContent).toContain("1 of 2 files outside the scope, for example code/app.md");
+    expect(plugin.config.scopePatterns).toBe("");
+
+    area.dispatch("change");
+    await vi.waitFor(() => expect(plugin.config.scopePatterns).toBe("code/"));
+    expect(applyDraft).not.toHaveBeenCalled();
+    expect(plugin.config.scopeMode).toBe("exclude");
+  });
+
+  it("warns when Only selected has no patterns", async () => {
+    stubClipboard();
+    const { plugin, tab } = await createConfiguredPlugin();
+    const panel = openAdvanced(tab);
+    const toggle = findSettingInput(panel, "Only sync selected files");
+    toggle.checked = true;
+    toggle.dispatch("change");
+    expect(byClass(panel, "flash-sync-scope-warning").textContent).toContain("nothing will sync");
+    await vi.waitFor(() => expect(plugin.config.scopeMode).toBe("only"));
+  });
+
+  it("shows how many changes sync scope is holding", async () => {
+    stubClipboard();
+    const { plugin, tab } = await createConfiguredPlugin();
+    plugin.status.held = 2;
+    plugin.status.refresh();
+    tabs(tab)[0].click();
+    expect(panelOf(tab).textContent).toContain("2 changes held by sync scope");
+    findButton(panelOf(tab), "Review sync scope").click();
+    expect(findSetting(panelOf(tab), "Skip common junk")).toBeDefined();
   });
 
   it("commits an inline limit once per changed value and keeps invalid values unsaved", async () => {

@@ -16,7 +16,7 @@ Non-goals: server-side filtering (NATS KV has no key filter and no custom API is
 
 ## Impact
 
-- Code: new `packages/plugin/src/sync-scope.ts`; `main.ts` (`validIncluded`, settings), `markdown-sync.ts` (scope gate, held outbox), `settings/model.ts`, `settings/tab.ts`, `local-store.ts` (held flag).
+- Code: new `packages/plugin/src/sync-scope.ts`; `main.ts` (`validIncluded`, settings), `markdown-sync.ts` (scope gate, held outbox), `settings/model.ts`, `settings/tab.ts`, `connection.ts` (held count).
 - Tests: new `tests/unit/sync-scope.test.ts`; additions to engine and settings tests.
 - Specs: new `sync-scope`; modified `settings-ui` (ADDED requirement).
 - Design: `docs/design/settings-ui/design-qa.md`, captures marked pending.

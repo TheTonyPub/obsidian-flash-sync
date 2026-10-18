@@ -29,7 +29,7 @@ layout, hierarchy, copy and states. Where they differ, the spec wins.
 - Three sections: **Sync** (default), **Server**, **Advanced**. Desktop uses tabs; mobile uses a full-width segmented control.
 - Sync, top to bottom: status summary (label, one sentence, server / attachments / upload queue), conflicts, other devices (send, receive), status-bar mode.
 - Server: import hint, Sync server group, Attachment storage group with a switch, sticky unsaved-changes bar.
-- Advanced: Sync (inline limit), This device (device ID), Diagnostics (debug logging, status report).
+- Advanced: Sync (inline limit), Sync scope (Only-selected switch, Skip-junk switch, monospaced Patterns area, live match preview, empty-list warning), This device (device ID), Diagnostics (debug logging, status report).
 
 ## Visual rules
 
@@ -48,6 +48,10 @@ layout, hierarchy, copy and states. Where they differ, the spec wins.
 - The generated phrase in the mockups uses words; the implemented format is set in the change design.
 - The QR codes are decorative patterns, not scannable payloads.
 - The Obsidian window chrome and sidebar are simplified.
+
+## Pending captures
+
+- `sync-scope-rules`: the Sync scope group in Advanced and the "held by sync scope" line in Sync have no reference PNG or `.dc.html` source yet; the captures are pending.
 
 ## Updating
 

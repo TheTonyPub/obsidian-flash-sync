@@ -1,7 +1,7 @@
 import { Notice, Setting } from "obsidian";
 import { DEFAULT_INLINE_LIMIT } from "../blob-storage.js";
 import { button, copyText, groupHeading, type SectionContext } from "./dom.js";
-import type { AdvancedUpdate, SettingsApplyResult } from "./model.js";
+import type { AdvancedUpdate, ScopeUpdate, SettingsApplyResult } from "./model.js";
 
 const INLINE_LIMIT_HELP = "Notes up to this size are stored on the sync server. Larger files use attachment storage, " +
   "or stay on this device without it. Changing it reconnects sync.";
@@ -42,6 +42,8 @@ export class AdvancedSection {
     input.addEventListener("change", commit);
     input.addEventListener("blur", commit);
 
+    this.renderScope(panel);
+
     groupHeading(panel, "This device");
     const deviceRow = new Setting(panel.createDiv({ cls: "flash-sync-card" })).setName("Device ID")
       .setDesc("Used in conflict copy names, so you can tell which device made a change.");
@@ -62,6 +64,60 @@ export class AdvancedSection {
       await copyText(host.statusReport());
       new Notice("Status report copied");
     } });
+  }
+
+  private renderScope(panel: HTMLElement): void {
+    const { host } = this.ctx;
+    groupHeading(panel, "Sync scope");
+    const card = panel.createDiv({ cls: "flash-sync-card flash-sync-scope" });
+    const scopeState = (): Required<ScopeUpdate> => ({ scopeMode: host.config.scopeMode, scopePatterns: host.config.scopePatterns, skipJunk: host.config.skipJunk });
+    let draft = scopeState();
+    const refresh: { run: () => void } = { run: () => {} };
+    const commit = (): void => {
+      void host.applyScopeUpdate(draft).then((outcome) => {
+        if (outcome.kind === "persistence-error") {
+          new Notice(`Could not save settings: ${outcome.message}`);
+          this.ctx.rerender();
+        }
+      });
+    };
+
+    new Setting(card).setName("Only sync selected files")
+      .setDesc("Off: everything syncs except the patterns below. On: only paths matching the patterns sync.")
+      .addToggle((toggle) => toggle.setValue(draft.scopeMode === "only").onChange((value) => {
+        draft = { ...draft, scopeMode: value ? "only" : "exclude" };
+        refresh.run();
+        commit();
+      }));
+    new Setting(card).setName("Skip common junk")
+      .setDesc("Ignores venv, node_modules, __pycache__, .git, .DS_Store, Thumbs.db and *.pyc in every folder.")
+      .addToggle((toggle) => toggle.setValue(draft.skipJunk).onChange((value) => {
+        draft = { ...draft, skipJunk: value };
+        refresh.run();
+        commit();
+      }));
+    const rules = new Setting(card).setName("Patterns")
+      .setDesc("One per line, like .gitignore: folder/, *.log, /top-level, **/cache, !exception, # comment. Matching ignores case. " +
+        "Files that fall outside the scope stay where they are on this device and on the server; nothing is deleted.");
+    rules.addTextArea((area) => {
+      area.setValue(draft.scopePatterns).setPlaceholder("code/\n*.log");
+      area.inputEl.classList.add("flash-sync-mono", "flash-sync-scope-patterns");
+      area.inputEl.setAttribute("aria-label", "Sync scope patterns");
+      area.inputEl.setAttribute("rows", "6");
+      area.inputEl.setAttribute("spellcheck", "false");
+      area.inputEl.addEventListener("input", () => { draft = { ...draft, scopePatterns: area.inputEl.value }; refresh.run(); });
+      area.inputEl.addEventListener("change", () => { draft = { ...draft, scopePatterns: area.inputEl.value }; commit(); });
+    });
+    const preview = card.createDiv({ cls: "flash-sync-muted flash-sync-scope-preview" });
+    const warning = card.createDiv({ cls: "flash-sync-field-error flash-sync-scope-warning" });
+    refresh.run = (): void => {
+      const result = host.previewScope(draft);
+      preview.textContent = `${result.outScope} of ${result.inScope + result.outScope} files outside the scope` +
+        (result.outSamples.length ? `, for example ${result.outSamples.join(", ")}` : "");
+      warning.textContent = draft.scopeMode === "only" && !draft.scopePatterns.trim()
+        ? "Only selected has no patterns, so nothing will sync until you add some." : "";
+    };
+    refresh.run();
   }
 
   private async save(update: AdvancedUpdate, row?: Setting): Promise<SettingsApplyResult> {

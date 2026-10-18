@@ -10,7 +10,7 @@
 4. **Evaluation order:** conflict-review folder and dot-part paths stay always out. Then the built-in junk list, if enabled, excludes any path with a matching part. Then user lines: Exclude mode syncs a path unless the final match excludes it; Only selected syncs it only if the final match includes it. In Only selected, `!pattern` carves out. Rejected: letting user lines override the junk list; the toggle is the escape.
 5. **Engine gate.** The engine receives `isInScope` in `MarkdownSyncOptions`. Out-of-scope local events and scan entries are ignored. A rename is treated as a delete of the old path if only the old path was in scope, a create if only the new one is, and ignored if neither.
 6. **Out-of-scope is not deletion.** Remote apply skips out-of-scope live records, leaving the index entry and KV untouched. A tombstone, rename or path release is never published because of scope, so a rule edit cannot delete data. Rejected: tombstoning on exclusion.
-7. **Held outbox.** Queued operations for out-of-scope paths get `held: true`, keep their content, and are skipped by replay. Removing the rule or editing the path releases them. Rejected: dropping them, which breaks "pending content stays".
+7. **Held outbox.** Queued operations for out-of-scope paths keep their stored content and are skipped by replay; held is derived from the current scope, not stored, so it survives restarts and releases when the rule changes. `SyncStatus.held` counts them. Rejected: dropping them (breaks "pending content stays") and a persisted flag (a second source of truth).
 
 ## Risks
 
