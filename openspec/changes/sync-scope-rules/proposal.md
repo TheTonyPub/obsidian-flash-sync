@@ -1,3 +1,5 @@
+> Approved: 2026-10-18 by the owner.
+
 ## Why
 
 Obsidian does not hide visible folders such as `venv`, `node_modules` or `__pycache__`, so a vault that also holds code uploads thousands of junk files. Today only dot-path parts and the conflict-review folder are skipped. The user needs a .gitignore-style way to say what to skip, or to sync only chosen folders and file types.

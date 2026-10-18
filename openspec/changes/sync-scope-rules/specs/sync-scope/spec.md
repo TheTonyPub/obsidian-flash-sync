@@ -16,7 +16,7 @@ The plugin SHALL keep a pattern list and a mode, Exclude (default) or Only selec
 - **THEN** `Projects/private/a.md` is out of scope
 
 ### Requirement: Common junk is skipped by default
-With the built-in skip list enabled (default), a path with a part named `venv`, `.venv`, `env`, `node_modules`, `__pycache__`, `.git`, `.idea`, `.vscode`, `.DS_Store`, `Thumbs.db`, or ending `.pyc`, SHALL be out of scope in both modes regardless of user lines. Disabling the toggle SHALL remove only this list. The conflict-review folder and dot-prefixed path parts SHALL stay out of scope in every configuration.
+With the built-in skip list enabled (default), a path with a part named `venv`, `.venv`, `node_modules`, `__pycache__`, `.git`, `.idea`, `.vscode`, `.DS_Store`, `Thumbs.db`, or ending `.pyc`, SHALL be out of scope in both modes regardless of user lines. Disabling the toggle SHALL remove only this list. The conflict-review folder and dot-prefixed path parts SHALL stay out of scope in every configuration.
 
 #### Scenario: Visible virtualenv
 - **WHEN** a visible `scripts/venv/lib/x.py` is created
