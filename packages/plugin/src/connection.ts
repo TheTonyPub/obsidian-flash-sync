@@ -67,6 +67,8 @@ export class SyncStatus {
   connected = false;
   reconciled = false;
   pending = 0;
+  /** Queued changes held because their path is outside the sync scope. */
+  held = 0;
   conflicts = 0;
   private readonly errorKeys = new Set<string>();
   get errors(): number { return this.errorKeys.size; }

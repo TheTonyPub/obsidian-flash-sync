@@ -55,10 +55,11 @@ function count(value: number, singular: string, plural: string): string {
 }
 
 export function queueFact(status: SyncStatus): StatusFact {
-  if (status.pending === 0 && status.blobsPending === 0) return { tone: "gray", value: "Nothing", detail: "0 notes · 0 attachments" };
+  const held = status.held ? ` · ${count(status.held, "change", "changes")} held by sync scope` : "";
+  if (status.pending === 0 && status.blobsPending === 0) return { tone: "gray", value: "Nothing", detail: `0 notes · 0 attachments${held}` };
   const parts = [status.pending ? count(status.pending, "note", "notes") : "",
     status.blobsPending ? count(status.blobsPending, "attachment", "attachments") : ""].filter(Boolean);
-  return { tone: "yellow", value: parts.join(" · "), detail: status.connected ? "Uploading" : "Saved on this device" };
+  return { tone: "yellow", value: parts.join(" · "), detail: `${status.connected ? "Uploading" : "Saved on this device"}${held}` };
 }
 
 /** Short relative age for display; wall-clock time is never used for ordering. */

@@ -38,6 +38,8 @@ export interface MarkdownSyncOptions {
   status: SyncStatus;
   debounceMs?: number;
   logger?: PluginLogger;
+  /** Per-device sync scope; out-of-scope paths are never captured, applied or uploaded. */
+  isInScope?: (path: string) => boolean;
 }
 
 export function retryDelay(failures: number): number {
@@ -78,6 +80,31 @@ export class MarkdownSyncEngine {
   private stopped = false;
 
   constructor(private readonly options: MarkdownSyncOptions) {}
+
+  private inScope(path: string): boolean {
+    return this.options.isInScope?.(path) ?? true;
+  }
+
+  /** Swap the scope live; held work resumes or pauses and reconciliation re-applies remote records. */
+  async updateScope(isInScope: (path: string) => boolean): Promise<void> {
+    this.options.isInScope = isInScope;
+    this.remoteRevisionBoundary.clear();
+    await this.refreshPendingCount();
+    await this.reconcile();
+  }
+
+  /** Queued operations whose path is out of scope stay stored but are not uploaded. */
+  private isHeld(operation: OutboxOperation): boolean {
+    return !this.inScope(operation.path);
+  }
+
+  private async refreshPendingCount(): Promise<void> {
+    const pending = await this.options.store.pending();
+    const held = pending.filter((operation) => this.isHeld(operation)).length;
+    this.options.status.pending = pending.length - held;
+    this.options.status.held = held;
+    this.options.status.refresh();
+  }
 
   private async isLocalOnlyArtifactPath(path: string): Promise<boolean> {
     if (isConflictReviewPath(path)) return true;
@@ -139,7 +166,7 @@ export class MarkdownSyncEngine {
   }
 
   scheduleCapture(path: string, content: string): void {
-    if (this.stopped || isConflictReviewPath(path)) return;
+    if (this.stopped || isConflictReviewPath(path) || !this.inScope(path)) return;
     const previous = this.timers.get(path);
     if (previous) clearTimeout(previous);
     const timer = setTimeout(() => {
@@ -150,6 +177,7 @@ export class MarkdownSyncEngine {
   }
 
   async capture(path: string, content: string): Promise<void> {
+    if (!this.inScope(path)) return;
     if (await this.isLocalOnlyArtifactPath(path)) return;
     const next = this.captureChain.catch(() => {}).then(() => this.captureOne(path, new TextEncoder().encode(content), content));
     this.captureChain = next;
@@ -157,6 +185,7 @@ export class MarkdownSyncEngine {
   }
 
   async captureBytes(path: string, bytes: Uint8Array): Promise<void> {
+    if (!this.inScope(path)) return;
     if (await this.isLocalOnlyArtifactPath(path)) return;
     const content = path.endsWith(".md") ? new TextDecoder().decode(bytes) : undefined;
     const next = this.captureChain.catch(() => {}).then(() => this.captureOne(path, bytes, content));
@@ -167,6 +196,15 @@ export class MarkdownSyncEngine {
   async rename(from: string, to: string): Promise<void> {
     from = normalizePath(from); to = normalizePath(to);
     if (from === to || await this.isLocalOnlyArtifactPath(from) || isConflictReviewPath(to)) return;
+    const fromIn = this.inScope(from);
+    const toIn = this.inScope(to);
+    if (!fromIn && !toIn) return;
+    if (!fromIn) {
+      const moved = await this.options.vault.read(to);
+      if (moved) await this.captureBytes(to, moved);
+      return;
+    }
+    if (!toIn) { await this.remove(from); return; }
     const { store, vault, status } = this.options;
     const indexed = await store.getFileByPath(from);
     if (!indexed) return;
@@ -184,13 +222,13 @@ export class MarkdownSyncEngine {
       kind: content === undefined ? "blob" : "text", baseContent: indexed.baseContent,
       baseHash: indexed.remoteHash, baseRevision: indexed.remoteRevision, retryCount: 0, createdAt: Date.now() };
     await store.queuePathReuse(operation, { ...indexed, path: to, localHash: operation.localHash, state: "pending" }, releasedFileId);
-    status.pending = (await store.pending()).length; status.refresh();
+    await this.refreshPendingCount(); status.refresh();
     await this.replayPending();
   }
 
   async remove(path: string): Promise<void> {
     path = normalizePath(path);
-    if (await this.isLocalOnlyArtifactPath(path)) return;
+    if (!this.inScope(path) || await this.isLocalOnlyArtifactPath(path)) return;
     const { store, status } = this.options;
     const local = await this.options.vault.read(path);
     if (local) {
@@ -204,7 +242,7 @@ export class MarkdownSyncEngine {
       localHash: indexed.localHash, baseHash: indexed.remoteHash, baseRevision: indexed.remoteRevision,
       baseContent: indexed.baseContent, retryCount: 0, createdAt: Date.now() });
     await store.putFile({ ...indexed, deleted: true, state: "pending" });
-    status.pending = (await store.pending()).length; status.refresh();
+    await this.refreshPendingCount(); status.refresh();
     await this.replayPending();
   }
 
@@ -363,7 +401,7 @@ export class MarkdownSyncEngine {
     const conflicts = await this.options.store.unresolvedConflicts();
     this.options.status.conflictPaths = conflicts.map((item) => item.copyPath);
     this.options.status.conflicts = conflicts.length;
-    this.options.status.pending = (await this.options.store.pending()).length;
+    await this.refreshPendingCount();
     this.options.status.refresh();
   }
 
@@ -394,7 +432,7 @@ export class MarkdownSyncEngine {
     await this.options.store.queue(operation);
     await this.options.store.putFile({ ...previous, fileId, path, localHash: hash,
       kind: operation.kind, state: "pending" });
-    this.options.status.pending = (await this.options.store.pending()).length;
+    await this.refreshPendingCount();
     this.options.status.refresh();
     await this.replayPending();
   }
@@ -446,7 +484,7 @@ export class MarkdownSyncEngine {
       return true;
     };
     status.reconciled = false;
-    status.pending = (await store.pending()).length;
+    await this.refreshPendingCount();
     status.conflictPaths = (await store.unresolvedConflicts()).map((item) => item.copyPath);
     status.conflicts = status.conflictPaths.length;
     status.refresh();
@@ -544,7 +582,7 @@ export class MarkdownSyncEngine {
       const local = (vault.listFiles
         ? await vault.listFiles()
         : (await vault.listMarkdown()).map((file) => ({ path: file.path, bytes: new TextEncoder().encode(file.content) })))
-        .filter((file) => !isConflictReviewPath(file.path) && !generatedPaths.has(file.path));
+        .filter((file) => !isConflictReviewPath(file.path) && !generatedPaths.has(file.path) && this.inScope(file.path));
       const localByPath = new Map(local.map((file) => [file.path, file]));
       localScanMs = Math.round(performance.now() - localScanStartedAt);
       stage = "remote_list";
@@ -563,7 +601,7 @@ export class MarkdownSyncEngine {
         let record: RemoteFileRecord;
         try { record = decodeRecord(entry.value); }
         catch { this.reportRecoverableIssue("A remote file record could not be decoded during reconciliation."); continue; }
-        if (isConflictReviewPath(record.path)) continue;
+        if (isConflictReviewPath(record.path) || !this.inScope(record.path)) continue;
         if (!record.deleted) remotePaths.add(record.path);
         if (record.deleted) { if (await applyRevision(entry)) remoteApplied++; continue; }
         const indexed = await store.getFile(record.fileId);
@@ -617,6 +655,7 @@ export class MarkdownSyncEngine {
           let record: RemoteFileRecord;
           try { record = decodeRecord(entry.value); }
           catch { this.reportRecoverableIssue("A remote file record could not be decoded during reconciliation."); continue; }
+          if (!this.inScope(record.path)) continue;
           if (!record.deleted) remotePaths.add(record.path);
           if (await applyRevision(entry)) remoteApplied++;
         }
@@ -677,7 +716,7 @@ export class MarkdownSyncEngine {
         await this.liveChain;
       }
     }
-    status.pending = (await store.pending()).length;
+    await this.refreshPendingCount();
     if (sourceFailure) {
       this.discoveryHealthy = false;
       status.reconciled = false;
@@ -820,6 +859,7 @@ export class MarkdownSyncEngine {
       const operation = (await store.pending()).find((item) => !processed.has(item.operationId) && !blockedFiles.has(item.fileId));
       if (!operation) break;
       processed.add(operation.operationId);
+      if (this.isHeld(operation)) { blockedFiles.add(operation.fileId); continue; }
       if (operation.content === undefined && operation.bytes === undefined && operation.type !== "delete") continue;
       if (!force && operation.nextAttemptAt && operation.nextAttemptAt > Date.now()) {
         this.scheduleRetry(operation.nextAttemptAt - Date.now());
@@ -864,7 +904,7 @@ export class MarkdownSyncEngine {
         continue;
       }
     }
-    status.pending = (await store.pending()).length;
+    await this.refreshPendingCount();
     status.refresh();
   }
 
@@ -1425,7 +1465,7 @@ export class MarkdownSyncEngine {
     let record: RemoteFileRecord;
     try { record = decodeRecord(value); }
     catch { this.reportRecoverableIssue("A remote file record could not be decoded."); return true; }
-    if (isConflictReviewPath(record.path)) return true;
+    if (isConflictReviewPath(record.path) || !this.inScope(record.path)) return true;
     const { store, vault } = this.options;
     const current = await store.getFile(record.fileId);
     if (current?.remoteRevision !== undefined && current.remoteRevision >= revision) return true;

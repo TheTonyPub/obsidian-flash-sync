@@ -22,6 +22,7 @@ For repository setup, branch rules, PR checks, and the full release cycle, read 
 - [Build from source (optional)](#build-from-source-optional)
 - [Configure an existing vault](#configure-an-existing-vault)
 - [S3 is optional](#s3-is-optional)
+- [Choose what syncs](#choose-what-syncs)
 - [Check connection](#check-connection)
 - [Server bootstrap CLI](#server-bootstrap-cli)
 - [Features](#features)
@@ -78,6 +79,16 @@ The plugin connects only to the bucket derived from the vault ID: `OBS_<vaultId>
 S3 is optional. Leave **Attachment storage** switched off on **Server** when object storage is not configured; Markdown and other content that fits the inline limit continue to synchronize through NATS. In this mode, images and other files larger than the inline limit are not synchronized.
 
 To enable large-file synchronization, switch on **Attachment storage** and configure all S3 fields: an HTTPS endpoint, bucket, region, access key ID, and secret key. The plugin reports incomplete or failed S3 configuration in its status and does not treat it as a successful large-file connection.
+
+## Choose what syncs
+
+Obsidian shows visible folders such as `venv`, `node_modules` or `__pycache__`, so a vault that also holds code can upload a lot of junk. Under **Advanced → Sync scope** you can control this on each device:
+
+- **Skip common junk** (on by default) ignores `venv`, `node_modules`, `__pycache__`, `.git`, `.DS_Store`, `Thumbs.db` and `*.pyc` in any folder. Folders and files whose names start with a dot are never synced.
+- **Patterns** use `.gitignore` syntax: `folder/`, `*.log`, `/top-level-only`, `**/cache`, `!exception`, `# comment`. The last matching line wins, a matched folder covers everything inside it, and matching ignores case.
+- **Only sync selected files** flips the list: only paths that match a pattern sync, for example `*.md` and `Attachments/`. With no patterns, nothing syncs.
+
+The scope is stored per device and is not sent to the server, so other devices keep their own rules. A file that falls outside the scope is left as it is on this device and on the server: nothing is deleted, and later edits stop syncing. Changes queued for such a file are held, shown in **Sync** as "held by sync scope", and resume if the file comes back into scope. Files already uploaded stay on the server until you remove them.
 
 ## Check connection
 

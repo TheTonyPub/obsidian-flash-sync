@@ -12,8 +12,9 @@ import { PLUGIN_ID, registerImportUriHandlers } from "./plugin-identity.js";
 import type { SettingsField, SettingsValidationErrors } from "./settings-validation.js";
 import type { ConflictHistoryEntry, ConflictRecord } from "./local-store.js";
 import { statusPresentation } from "./status-presentation.js";
+import { compileScope, previewScope, sanitizeScopeSettings } from "./sync-scope.js";
 import { draftFor, validateDraft, type AdvancedUpdate, type ConflictComparison, type EasySyncSettings,
-  type SettingsApplyResult, type SettingsDraft, type SettingsHost, type SettingsSection } from "./settings/model.js";
+  type ScopeUpdate, type SettingsApplyResult, type SettingsDraft, type SettingsHost, type SettingsSection } from "./settings/model.js";
 import { EasySyncSettingTab } from "./settings/tab.js";
 import { ImportConfigModal } from "./settings/transfer-modals.js";
 
@@ -166,6 +167,8 @@ export default class EasySyncPlugin extends Plugin implements SettingsHost {
       inlineLimit: saved?.inlineLimit ?? DEFAULT_INLINE_LIMIT,
       debugLogging: saved?.debugLogging ?? false,
       statusBarMode: saved?.statusBarMode ?? "extended",
+      ...(() => { const scope = sanitizeScopeSettings({ mode: saved?.scopeMode, patterns: saved?.scopePatterns, skipJunk: saved?.skipJunk });
+        return { scopeMode: scope.mode, scopePatterns: scope.patterns, skipJunk: scope.skipJunk }; })(),
     };
     await this.saveSettings();
     const statusBar = this.addStatusBarItem();
@@ -367,6 +370,40 @@ export default class EasySyncPlugin extends Plugin implements SettingsHost {
 
   async applyAdvancedUpdate(update: AdvancedUpdate): Promise<SettingsApplyResult> {
     return this.applyDraft((settings) => ({ ...draftFor(settings), ...update }), "advanced");
+  }
+
+  private scopeMatcher(settings: EasySyncSettings): (path: string) => boolean {
+    return compileScope({ mode: settings.scopeMode, patterns: settings.scopePatterns, skipJunk: settings.skipJunk }).isInScope;
+  }
+
+  previewScope(scope: ScopeUpdate): { inScope: number; outScope: number; outSamples: string[] } {
+    const candidate = sanitizeScopeSettings({ mode: scope.scopeMode ?? this.config.scopeMode,
+      patterns: scope.scopePatterns ?? this.config.scopePatterns, skipJunk: scope.skipJunk ?? this.config.skipJunk });
+    const paths = this.app.vault.getFiles().map((file) => file.path).filter(validIncluded);
+    return previewScope(compileScope(candidate).isInScope, paths);
+  }
+
+  /** Scope changes apply live: no reconnect, and nothing is deleted locally or remotely. */
+  async applyScopeUpdate(update: ScopeUpdate): Promise<SettingsApplyResult> {
+    return this.serialize(async () => {
+      const scope = sanitizeScopeSettings({ mode: update.scopeMode ?? this.config.scopeMode,
+        patterns: update.scopePatterns ?? this.config.scopePatterns, skipJunk: update.skipJunk ?? this.config.skipJunk });
+      const previous = this.config;
+      const next: EasySyncSettings = { ...previous, scopeMode: scope.mode, scopePatterns: scope.patterns, skipJunk: scope.skipJunk };
+      try { await this.saveData(next); }
+      catch (error) { return { kind: "persistence-error", message: this.safeDiagnostic(error) }; }
+      this.config = next;
+      this.settingsTab?.onApplied(next, "advanced");
+      if (this.engine) {
+        const engine = this.engine;
+        void engine.updateScope(this.scopeMatcher(next)).then(() => { this.lastReconciledAt = Date.now(); }).catch((error: unknown) => {
+          this.status.lastError = errorSummary(error);
+          this.status.refresh();
+          this.logger.error("scope.apply_failed", error);
+        });
+      }
+      return { kind: "applied" };
+    });
   }
 
   async syncNow(): Promise<void> {
@@ -595,7 +632,7 @@ export default class EasySyncPlugin extends Plugin implements SettingsHost {
       }
       const engine = new MarkdownSyncEngine({ deviceId: config.deviceId, vaultId: config.vaultId,
         vault: new ObsidianMarkdownVault(this.app), store, kv, blob: this.blob,
-        inlineLimit: config.inlineLimit, status: this.status, logger: this.logger });
+        inlineLimit: config.inlineLimit, status: this.status, logger: this.logger, isInScope: this.scopeMatcher(config) });
       this.engine = engine;
       const reconcileStartedAt = performance.now();
       this.initialReconcileInFlight = true;

@@ -86,7 +86,7 @@ class ObsidianVaultDouble {
 function pluginSettings(plugin: EasySyncPlugin): void {
   plugin.config = { vaultId: "VAULT_A", boundVaultId: "", deviceId: "device-a", server: "wss://nats.example.test",
     username: "alice", passwordSecretKey: "nats-password", s3Endpoint: "", s3Bucket: "", s3Region: "us-east-1",
-    s3AccessKeyId: "", s3SecretKeySecretKey: "", inlineLimit: 262144, debugLogging: false, statusBarMode: "extended" };
+    s3AccessKeyId: "", s3SecretKeySecretKey: "", inlineLimit: 262144, debugLogging: false, statusBarMode: "extended", scopeMode: "exclude", scopePatterns: "", skipJunk: true };
 }
 
 async function connectedPlugin(vault: ObsidianVaultDouble) {
